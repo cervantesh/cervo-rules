@@ -1,0 +1,6 @@
+operations:
+  - command.execute
+targets:
+  - command-runner
+executors:
+  - runner-primary

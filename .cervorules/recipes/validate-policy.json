@@ -1,0 +1,23 @@
+{
+  "$schema": "../schemas/task-recipe.schema.json",
+  "id": "validate-policy",
+  "goal": "Validate v3 vocabulary and policy YAML without mutating generated files.",
+  "when_to_use": "Use before generation, before PR, and when reviewing v3 policy-only changes.",
+  "inputs": [
+    "policy-vocabulary.yaml",
+    "policy-rules.yaml"
+  ],
+  "outputs": [
+    "JSON validation report"
+  ],
+  "commands": [
+    "go run ./cmd/cervorules-policygen check -vocab policy-vocabulary.yaml -policy policy-rules.yaml -format json"
+  ],
+  "checks": [
+    "go test -count=1 ./..."
+  ],
+  "failure_mode": "Fail the task if the check command returns non-zero or emits invalid JSON.",
+  "notes": [
+    "Use JSON output when another agent or CI step consumes the result."
+  ]
+}

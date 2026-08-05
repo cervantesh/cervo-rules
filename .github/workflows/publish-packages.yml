@@ -1,0 +1,131 @@
+name: Publish Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to package, for example v0.2.0'
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  PACKAGE_OWNER: CervoSoft
+  GENERIC_PACKAGE: cervo-rules
+  OCI_IMAGE: cervorules-tools
+
+jobs:
+  package-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME}"
+          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "source_date_epoch=$(git log -1 --format=%ct)" >> "${GITHUB_OUTPUT}"
+
+      - name: Setup Go
+        run: bash scripts/ci/setup-go-ci.sh
+
+      - name: Test
+        run: go test -count=1 ./...
+
+      - name: Preflight OCI registry
+        if: vars.CERVORULES_PUBLISH_OCI == 'true'
+        shell: bash
+        env:
+          PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
+          REGISTRY_ACTOR: ${{ github.actor }}
+          SERVER_URL: ${{ github.server_url }}
+          OCI_REGISTRY: ${{ vars.CERVORULES_OCI_REGISTRY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PACKAGE_TOKEN:-}" ]]; then
+            echo "Missing PACKAGE_TOKEN secret for OCI publishing" >&2
+            exit 1
+          fi
+          registry="${OCI_REGISTRY:-}"
+          if [[ -z "${registry}" ]]; then
+            registry="${SERVER_URL#https://}"
+            registry="${registry#http://}"
+          fi
+          echo "Checking Docker registry reachability for ${registry}"
+          timeout 30 sh -c 'printf "%s" "$1" | docker login "$2" --username "$3" --password-stdin' sh "${PACKAGE_TOKEN}" "${registry}" "${REGISTRY_ACTOR}"
+
+      - name: Build release artifacts
+        shell: bash
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.version.outputs.source_date_epoch }}
+          CERVORULES_MINISIGN_SECRET_KEY: ${{ secrets.CERVORULES_MINISIGN_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${CERVORULES_MINISIGN_SECRET_KEY:-}" ]]; then
+            printf '%s' "${CERVORULES_MINISIGN_SECRET_KEY}" > minisign-release.key
+            chmod 600 minisign-release.key
+            export CERVORULES_MINISIGN_SECRET_KEY_FILE="${PWD}/minisign-release.key"
+            export CERVORULES_MINISIGN_UNENCRYPTED=1
+          fi
+          bash scripts/release/build-artifacts.sh "${{ steps.version.outputs.version }}" dist
+
+      - name: Publish generic packages
+        shell: bash
+        env:
+          PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
+          REGISTRY_ACTOR: ${{ github.actor }}
+          VERSION: ${{ steps.version.outputs.version }}
+          SERVER_URL: ${{ github.server_url }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PACKAGE_TOKEN:-}" ]]; then
+            echo "Missing PACKAGE_TOKEN secret for package publishing" >&2
+            exit 1
+          fi
+          api="${SERVER_URL%/}/api/packages/${PACKAGE_OWNER}/generic/${GENERIC_PACKAGE}/${VERSION}"
+          for file in dist/*; do
+            if [[ -f "${file}" ]]; then
+              name="$(basename "${file}")"
+              curl --fail --show-error --silent \
+                --user "${REGISTRY_ACTOR}:${PACKAGE_TOKEN}" \
+                --upload-file "${file}" \
+                "${api}/${name}"
+            fi
+          done
+
+      - name: Publish OCI tools image
+        if: vars.CERVORULES_PUBLISH_OCI == 'true'
+        shell: bash
+        env:
+          PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
+          REGISTRY_ACTOR: ${{ github.actor }}
+          VERSION: ${{ steps.version.outputs.version }}
+          SERVER_URL: ${{ github.server_url }}
+          OCI_REGISTRY: ${{ vars.CERVORULES_OCI_REGISTRY }}
+        run: |
+          set -euo pipefail
+          registry="${OCI_REGISTRY:-}"
+          if [[ -z "${registry}" ]]; then
+            registry="${SERVER_URL#https://}"
+            registry="${registry#http://}"
+          fi
+          oci_owner="$(printf '%s' "${PACKAGE_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          image="${registry}/${oci_owner}/${OCI_IMAGE}:${VERSION}"
+          latest="${registry}/${oci_owner}/${OCI_IMAGE}:latest"
+          echo "${PACKAGE_TOKEN}" | docker login "${registry}" --username "${REGISTRY_ACTOR}" --password-stdin
+          docker build -f build/tools/Dockerfile --build-arg "VERSION=${VERSION}" -t "${image}" -t "${latest}" .
+          docker push "${image}"
+          docker push "${latest}"

@@ -1,0 +1,25 @@
+version: cervorules.policy.v3
+name: device-routing.v3
+defaults:
+  executor: edge_cluster
+routes:
+  - id: telemetry_ingest
+    operation: telemetry_ingest
+    target: telemetry_pipeline
+    executor: edge_cluster
+  - id: firmware_update
+    operation: firmware_update
+    target: telemetry_pipeline
+    executor: edge_cluster
+  - id: remote_unlock
+    operation: remote_unlock
+    target: telemetry_pipeline
+    executor: edge_cluster
+tests:
+  - name: telemetry_ingest routes
+    request:
+      operation: telemetry_ingest
+    expect:
+      allow: true
+      target: telemetry_pipeline
+      executor: edge_cluster

@@ -1,0 +1,6 @@
+name: device-routing
+dsl_version: v3
+routes:
+  - operation: device.command
+    target: device-controller
+    executor: controller-primary

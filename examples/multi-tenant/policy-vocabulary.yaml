@@ -1,0 +1,7 @@
+operations:
+  tenant_admin: {}
+  tenant_read: {}
+targets:
+  tenant_api: {}
+executors:
+  internal: {}

@@ -1,0 +1,6 @@
+name: queue-event-routing
+dsl_version: v3
+routes:
+  - operation: event.consume
+    target: queue-worker
+    executor: queue-primary

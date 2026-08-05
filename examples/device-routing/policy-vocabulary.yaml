@@ -1,0 +1,11 @@
+operations:
+  telemetry_ingest: {}
+  firmware_update: {}
+  remote_unlock: {}
+targets:
+  telemetry_pipeline: {}
+  device_command_gateway: {}
+executors:
+  edge_cluster: {}
+  control_plane: {}
+  backup_control_plane: {}

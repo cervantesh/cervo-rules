@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CervoRules Agent Manifest",
+  "type": "object",
+  "required": [
+    "project",
+    "current_version",
+    "status",
+    "module",
+    "entrypoints",
+    "schemas",
+    "recipes",
+    "examples",
+    "packages",
+    "commands",
+    "required_checks",
+    "boundaries"
+  ],
+  "properties": {
+    "project": { "type": "string", "const": "CervoRules" },
+    "current_version": { "type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$" },
+    "status": { "type": "string" },
+    "module": { "type": "string" },
+    "entrypoints": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "schemas": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 2,
+      "uniqueItems": true
+    },
+    "recipes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "examples": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "packages": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "commands": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "required_checks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "boundaries": {
+      "type": "object",
+      "required": ["core_owns", "core_does_not_own"],
+      "properties": {
+        "core_owns": { "type": "array", "items": { "type": "string" } },
+        "core_does_not_own": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

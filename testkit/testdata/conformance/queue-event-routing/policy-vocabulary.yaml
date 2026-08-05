@@ -1,0 +1,6 @@
+operations:
+  - event.consume
+targets:
+  - queue-worker
+executors:
+  - queue-primary

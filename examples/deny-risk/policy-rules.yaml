@@ -1,0 +1,17 @@
+version: cervorules.policy.v3
+name: deny-risk.v3
+defaults:
+  executor: internal
+routes:
+  - id: deploy_production
+    operation: deploy_production
+    target: deploy_api
+    executor: internal
+tests:
+  - name: deploy_production routes
+    request:
+      operation: deploy_production
+    expect:
+      allow: true
+      target: deploy_api
+      executor: internal

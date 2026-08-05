@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cervantesh/cervo-rules/schemas/v3/policy-vocabulary.schema.json",
+  "title": "CervoRules v3 Policy Vocabulary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operations", "targets", "executors"],
+  "properties": {
+    "operations": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/entry" },
+      "description": "Caller-owned operation names that requests can ask for."
+    },
+    "targets": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/entry" },
+      "description": "Caller-owned target names selected by policies."
+    },
+    "executors": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/entry" },
+      "description": "Caller-owned executor names selected by policies."
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": { "type": "string" },
+        "go_name": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    }
+  }
+}

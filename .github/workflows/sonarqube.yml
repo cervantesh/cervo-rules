@@ -1,0 +1,44 @@
+name: SonarQube Analysis
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        run: bash scripts/ci/setup-go-ci.sh
+
+      - name: Check SonarQube configuration
+        id: sonar-config
+        shell: bash
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SONAR_HOST_URL:-}" || -z "${SONAR_TOKEN:-}" ]]; then
+            echo "configured=false" >> "${GITHUB_OUTPUT}"
+            echo "SONAR_HOST_URL or SONAR_TOKEN is not configured; skipping SonarQube scan."
+            exit 0
+          fi
+          echo "configured=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Run SonarQube scan
+        if: steps.sonar-config.outputs.configured == 'true'
+        shell: bash
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: bash scripts/sonar/scan.sh
+

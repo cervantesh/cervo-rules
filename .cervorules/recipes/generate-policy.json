@@ -1,0 +1,24 @@
+{
+  "$schema": "../schemas/task-recipe.schema.json",
+  "id": "generate-policy",
+  "goal": "Generate v3 policy code and generated tests from vocabulary and policy YAML.",
+  "when_to_use": "Use after editing v3 policy-vocabulary.yaml or policy-rules.yaml.",
+  "inputs": [
+    "policy-vocabulary.yaml",
+    "policy-rules.yaml"
+  ],
+  "outputs": [
+    "internal/policyrules/generated_policy.go",
+    "internal/policyrules/generated_policy_test.go"
+  ],
+  "commands": [
+    "go run ./cmd/cervorules-policygen generate -vocab policy-vocabulary.yaml -policy policy-rules.yaml -out internal/policyrules/generated_policy.go -test-out internal/policyrules/generated_policy_test.go -package policyrules -vocab-package policyvocab -vocab-import your/module/internal/policyvocab"
+  ],
+  "checks": [
+    "go test -count=1 ./..."
+  ],
+  "failure_mode": "Fail the task if generation changes files unexpectedly or generated tests do not compile.",
+  "notes": [
+    "Run validate-policy before generation when changing YAML by hand."
+  ]
+}

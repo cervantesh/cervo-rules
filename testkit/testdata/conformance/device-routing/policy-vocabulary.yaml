@@ -1,0 +1,6 @@
+operations:
+  - device.command
+targets:
+  - device-controller
+executors:
+  - controller-primary

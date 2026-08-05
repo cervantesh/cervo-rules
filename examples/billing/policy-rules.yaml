@@ -1,0 +1,25 @@
+version: cervorules.policy.v3
+name: billing.v3
+defaults:
+  executor: ledger_cluster
+routes:
+  - id: invoice_read
+    operation: invoice_read
+    target: ledger_api
+    executor: ledger_cluster
+  - id: payment_capture
+    operation: payment_capture
+    target: ledger_api
+    executor: ledger_cluster
+  - id: refund_issue
+    operation: refund_issue
+    target: ledger_api
+    executor: ledger_cluster
+tests:
+  - name: invoice_read routes
+    request:
+      operation: invoice_read
+    expect:
+      allow: true
+      target: ledger_api
+      executor: ledger_cluster

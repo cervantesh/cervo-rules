@@ -1,0 +1,19 @@
+name: Required Build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  go-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        run: bash scripts/ci/setup-go-ci.sh
+
+      - name: Test
+        run: go test ./...

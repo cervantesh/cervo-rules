@@ -1,0 +1,6 @@
+name: cli-command-routing
+dsl_version: v3
+routes:
+  - operation: command.execute
+    target: command-runner
+    executor: runner-primary

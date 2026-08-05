@@ -1,0 +1,17 @@
+version: cervorules.policy.v3
+name: fallback-health.v3
+defaults:
+  executor: standard_executor
+routes:
+  - id: task_route
+    operation: task_route
+    target: primary_worker
+    executor: standard_executor
+tests:
+  - name: task_route routes
+    request:
+      operation: task_route
+    expect:
+      allow: true
+      target: primary_worker
+      executor: standard_executor

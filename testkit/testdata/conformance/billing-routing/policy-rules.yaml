@@ -1,0 +1,6 @@
+name: billing-routing
+dsl_version: v3
+routes:
+  - operation: invoice.read
+    target: billing-ledger
+    executor: ledger-primary

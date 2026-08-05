@@ -1,0 +1,25 @@
+version: cervorules.policy.v3
+name: document-processing.v3
+defaults:
+  executor: regional_queue
+routes:
+  - id: extract_text
+    operation: extract_text
+    target: ocr_worker
+    executor: regional_queue
+  - id: classify_document
+    operation: classify_document
+    target: ocr_worker
+    executor: regional_queue
+  - id: redact_pii
+    operation: redact_pii
+    target: ocr_worker
+    executor: regional_queue
+tests:
+  - name: extract_text routes
+    request:
+      operation: extract_text
+    expect:
+      allow: true
+      target: ocr_worker
+      executor: regional_queue

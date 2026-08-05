@@ -1,0 +1,6 @@
+name: document-processing
+dsl_version: v3
+routes:
+  - operation: document.process
+    target: document-worker
+    executor: worker-primary

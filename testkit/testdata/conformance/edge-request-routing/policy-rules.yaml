@@ -1,0 +1,6 @@
+name: edge-request-routing
+dsl_version: v3
+routes:
+  - operation: request.route
+    target: request-router
+    executor: primary-route

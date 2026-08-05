@@ -1,0 +1,49 @@
+name: Performance Report
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'core/**'
+      - 'facts/**'
+      - 'httpadapter/**'
+      - 'scripts/performance/report.sh'
+      - '.github/workflows/performance-report.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark-report:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        run: bash scripts/ci/setup-go-ci.sh
+
+      - name: Run advisory performance report
+        shell: bash
+        run: bash scripts/performance/report.sh 2>&1 | tee performance-report.txt
+
+      - name: Run advisory performance matrix
+        shell: bash
+        run: CERVORULES_BENCHTIME=1x bash scripts/performance/report.sh matrix 2>&1 | tee performance-report-matrix.txt
+
+      - name: Run soft benchmark history check
+        shell: bash
+        run: bash scripts/performance/benchmark-history-check.sh performance-report.txt
+
+      - name: Upload performance report
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          # Keep artifact names under the performance-report-* family.
+          name: performance-report-${{ github.run_id }}
+          path: |
+            performance-report.txt
+            performance-report-matrix.txt

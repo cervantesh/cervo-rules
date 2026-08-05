@@ -1,0 +1,6 @@
+version: cervorules.policy.v3
+name: billing-routing.v3
+routes:
+  - operation: billing.read
+    target: billing-api
+    executor: primary

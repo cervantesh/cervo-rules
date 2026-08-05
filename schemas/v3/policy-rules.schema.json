@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cervantesh/cervo-rules/schemas/v3/policy-rules.schema.json",
+  "title": "CervoRules v3 Policy Rules",
+  "description": "Schema for the v3-native routing policy generator subset.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "name"],
+  "properties": {
+    "version": { "const": "cervorules.policy.v3" },
+    "name": { "$ref": "#/$defs/identifier" },
+    "trusted_users": { "type": "array", "items": { "type": "string" } },
+    "defaults": { "$ref": "#/$defs/defaults" },
+    "routes": { "type": "array", "items": { "$ref": "#/$defs/route" } },
+    "denies": { "type": "array", "items": { "$ref": "#/$defs/deny" } },
+    "tests": { "type": "array", "items": { "$ref": "#/$defs/testCase" } }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$"
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "executor": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "target", "executor"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "operation": { "$ref": "#/$defs/identifier" },
+        "target": { "$ref": "#/$defs/identifier" },
+        "executor": { "$ref": "#/$defs/identifier" },
+        "fallback_executors": { "type": "array", "items": { "$ref": "#/$defs/identifier" } },
+        "disabled_by_default": { "type": "boolean" },
+        "disabled_reason": { "type": "string" },
+        "requires_trusted_user": { "type": "boolean" }
+      }
+    },
+    "deny": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "operation": { "$ref": "#/$defs/identifier" },
+        "reason": { "type": "string" }
+      }
+    },
+    "testCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request", "expect"],
+      "properties": {
+        "name": { "type": "string" },
+        "request": { "$ref": "#/$defs/testRequest" },
+        "expect": { "$ref": "#/$defs/testExpect" }
+      }
+    },
+    "testRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation"],
+      "properties": {
+        "id": { "type": "string" },
+        "user": { "type": "string" },
+        "channel": { "type": "string" },
+        "operation": { "$ref": "#/$defs/identifier" },
+        "metadata": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "testExpect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": { "type": "boolean" },
+        "target": { "$ref": "#/$defs/identifier" },
+        "executor": { "$ref": "#/$defs/identifier" },
+        "fallback_executors": { "type": "array", "items": { "$ref": "#/$defs/identifier" } },
+        "reason": { "type": "string" },
+        "reason_contains": { "type": "string" }
+      }
+    }
+  }
+}

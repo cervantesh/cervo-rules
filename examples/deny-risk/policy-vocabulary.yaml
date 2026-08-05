@@ -1,0 +1,6 @@
+operations:
+  deploy_production: {}
+targets:
+  deploy_api: {}
+executors:
+  internal: {}

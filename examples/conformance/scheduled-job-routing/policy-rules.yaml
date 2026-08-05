@@ -1,0 +1,6 @@
+version: cervorules.policy.v3
+name: scheduled-job-routing.v3
+routes:
+  - operation: job.run
+    target: scheduler
+    executor: primary

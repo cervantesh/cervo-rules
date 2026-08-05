@@ -1,0 +1,21 @@
+version: cervorules.policy.v3
+name: routing-basic.v3
+defaults:
+  executor: standard_executor
+routes:
+  - id: message_create
+    operation: message_create
+    target: message_worker
+    executor: standard_executor
+  - id: file_render
+    operation: file_render
+    target: message_worker
+    executor: standard_executor
+tests:
+  - name: message_create routes
+    request:
+      operation: message_create
+    expect:
+      allow: true
+      target: message_worker
+      executor: standard_executor

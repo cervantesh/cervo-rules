@@ -1,0 +1,6 @@
+version: cervorules.policy.v3
+name: document-processing.v3
+routes:
+  - operation: document.process
+    target: document-worker
+    executor: primary

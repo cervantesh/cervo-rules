@@ -1,0 +1,6 @@
+operations:
+  device.route: {}
+targets:
+  device-gateway: {}
+executors:
+  primary: {}

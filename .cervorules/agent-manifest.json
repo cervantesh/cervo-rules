@@ -1,0 +1,78 @@
+{
+  "project": "CervoRules",
+  "current_version": "v3.0.0-rc.3",
+  "status": "v3-release-candidate",
+  "module": "github.com/cervantesh/cervo-rules/v3",
+  "repository_layout": "v3-root",
+  "legacy_v2_repository": "https://github.com/cervantesh/cervo-rules-v2",
+  "next_major": {
+    "target_version": "v3.0.0-rc.3",
+    "module": "github.com/cervantesh/cervo-rules/v3",
+    "migration": "docs/v3/migration-v2-to-v3.md",
+    "api_reference": "docs/v3/api-reference.md",
+    "release_notes": "docs/v3/release-notes.md"
+  },
+  "entrypoints": {
+    "human": "README.md",
+    "agent": "AGENTS.md",
+    "quickstart": "docs/agent-quickstart.md",
+    "commands": "docs/agent-commands.md",
+    "recipes": "docs/agent-task-recipes.md",
+    "package_examples": "docs/package-minimal-examples.md",
+    "reports": "docs/reports/v3-rc2.md",
+    "roadmap": "docs/change-management/v3-final-reevaluation.md"
+  },
+  "schemas": [
+    ".cervorules/schemas/agent-manifest.schema.json",
+    ".cervorules/schemas/task-recipe.schema.json",
+    "schemas/policy-rules.schema.json",
+    "schemas/policy-vocabulary.schema.json"
+  ],
+  "recipes": [
+    ".cervorules/recipes/generate-policy.json",
+    ".cervorules/recipes/validate-policy.json",
+    ".cervorules/recipes/compare-policy.json",
+    ".cervorules/recipes/publish-packages.json",
+    ".cervorules/recipes/run-conformance.json"
+  ],
+  "examples": [
+    "docs/package-minimal-examples.md",
+    "examples/performance-hot-path",
+    "examples/logic-facts",
+    "examples/conformance"
+  ],
+  "packages": [
+    "core",
+    "runtime",
+    "limits",
+    "facts",
+    "httpadapter",
+    "observe",
+    "testkit"
+  ],
+  "commands": [
+    "cervorules-policygen check",
+    "cervorules-policygen generate",
+    "cervorules-vocabgen",
+    "sonarqube"
+  ],
+  "legacy_commands_repository": "CervoSoft/cervo-rules-v2 for v2 maintenance and historical migration/diff tooling",
+  "required_checks": [
+    "go test -count=1 ./...",
+    "go test -cover ./...",
+    "go vet ./...",
+    "go mod verify"
+  ],
+  "boundaries": {
+    "core_owns": [
+      "deterministic policy decisions"
+    ],
+    "core_does_not_own": [
+      "transport parsing",
+      "model selection",
+      "consumer vocabulary",
+      "data plane"
+    ]
+  }
+}
+

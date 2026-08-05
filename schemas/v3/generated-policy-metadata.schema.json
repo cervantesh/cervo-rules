@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cervantesh/cervo-rules/schemas/v3/generated-policy-metadata.schema.json",
+  "title": "CervoRules v3 Generated Policy Metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "name", "dsl_version", "generated_with", "vocabulary_hash", "policy_hash"],
+  "properties": {
+    "schema_version": { "const": "cervorules.v3.generated_policy_metadata.v1" },
+    "name": { "type": "string" },
+    "dsl_version": { "const": "cervorules.policy.v3" },
+    "generated_with": { "type": "string" },
+    "vocabulary_hash": { "type": "string", "pattern": "^sha256:" },
+    "policy_hash": { "type": "string", "pattern": "^sha256:" }
+  }
+}

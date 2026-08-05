@@ -1,0 +1,6 @@
+operations:
+  billing.read: {}
+targets:
+  billing-api: {}
+executors:
+  primary: {}

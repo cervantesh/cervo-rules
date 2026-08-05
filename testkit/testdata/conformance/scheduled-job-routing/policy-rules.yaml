@@ -1,0 +1,6 @@
+name: scheduled-job-routing
+dsl_version: v3
+routes:
+  - operation: job.run
+    target: scheduler
+    executor: scheduler-primary

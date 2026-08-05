@@ -1,0 +1,28 @@
+{
+  "$schema": "../schemas/task-recipe.schema.json",
+  "id": "publish-packages",
+  "goal": "Verify release artifacts and package registry contents for a tag.",
+  "when_to_use": "Use after creating a release tag or when validating a package smoke release.",
+  "inputs": [
+    "release tag such as v3.0.0-rc.3",
+    "package registry credentials"
+  ],
+  "outputs": [
+    "generic package verification",
+    "OCI package verification when enabled",
+    "checksums verification"
+  ],
+  "commands": [
+    "bash scripts/release/verify-generic-package.sh v3.0.0-rc.3",
+    "bash scripts/release/verify-oci-tools.sh v3.0.0-rc.3"
+  ],
+  "checks": [
+    "go test -count=1 ./...",
+    "go vet ./...",
+    "go mod verify"
+  ],
+  "failure_mode": "Fail the release if expected binaries, schemas, checksums, metadata, or CLI versions are missing.",
+  "notes": [
+    "Use the actual tag instead of v3.0.0-rc.3 for future releases."
+  ]
+}

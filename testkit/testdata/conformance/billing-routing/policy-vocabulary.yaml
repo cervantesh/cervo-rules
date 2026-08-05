@@ -1,0 +1,6 @@
+operations:
+  - invoice.read
+targets:
+  - billing-ledger
+executors:
+  - ledger-primary

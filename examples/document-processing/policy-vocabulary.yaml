@@ -1,0 +1,11 @@
+operations:
+  extract_text: {}
+  classify_document: {}
+  redact_pii: {}
+targets:
+  ocr_worker: {}
+  document_classifier: {}
+  redaction_worker: {}
+executors:
+  regional_queue: {}
+  local_runtime: {}

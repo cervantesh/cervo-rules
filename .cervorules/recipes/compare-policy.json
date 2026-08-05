@@ -1,0 +1,26 @@
+{
+  "$schema": "../schemas/task-recipe.schema.json",
+  "id": "compare-policy",
+  "goal": "Validate a v3 candidate policy before manual compatibility review.",
+  "when_to_use": "Use before replacing a v3 policy in a consumer or release branch while native v3 compat/inspect commands are still future work.",
+  "inputs": [
+    "policy-rules.current.yaml",
+    "policy-rules.candidate.yaml"
+  ],
+  "outputs": [
+    "JSON validation report",
+    "manual compatibility review notes"
+  ],
+  "commands": [
+    "go run ./cmd/cervorules-policygen check -vocab policy-vocabulary.yaml -policy policy-rules.candidate.yaml -format json",
+    "git diff --no-index -- policy-rules.current.yaml policy-rules.candidate.yaml"
+  ],
+  "checks": [
+    "go test -count=1 ./..."
+  ],
+  "failure_mode": "Fail the task when validation fails or the manual diff shows an unaccepted behavioral change.",
+  "notes": [
+    "Attach validation JSON and the policy diff to the issue or PR.",
+    "Use CervoSoft/cervo-rules-v2 only for historical v2 migration/diff tooling."
+  ]
+}

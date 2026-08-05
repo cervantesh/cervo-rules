@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cervantesh/cervo-rules/schemas/v1/policy-rules.schema.json",
+  "title": "CervoRules policy rules v1",
+  "description": "Closed schema for supported cervorules.policy.v1 policy-rules.yaml/json files.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "name"],
+  "properties": {
+    "version": { "const": "cervorules.policy.v1" },
+    "name": { "type": "string", "minLength": 1 },
+    "trusted_users": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "defaults": { "$ref": "#/$defs/defaults" },
+    "routes": { "type": "array", "items": { "$ref": "#/$defs/route" } },
+    "denies": { "type": "array", "items": { "$ref": "#/$defs/deny" } },
+    "audit": { "type": "array", "items": { "$ref": "#/$defs/auditRule" } },
+    "limits": { "type": "array", "items": { "$ref": "#/$defs/limit" } },
+    "tests": { "type": "array", "items": { "$ref": "#/$defs/declarativeTest" } },
+    "derived_facts": { "$ref": "#/$defs/derivedFacts" }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "minLength": 1 },
+    "auditClass": { "type": "string", "enum": ["none", "standard", "sensitive", "admin"] },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "provider": { "$ref": "#/$defs/identifier" },
+        "retry": { "$ref": "#/$defs/retry" },
+        "breaker": { "$ref": "#/$defs/breaker" }
+      }
+    },
+    "retry": { "type": "object", "additionalProperties": false, "properties": { "max_attempts": { "type": "integer", "minimum": 1 } } },
+    "breaker": { "type": "object", "additionalProperties": false, "properties": { "failure_threshold": { "type": "integer", "minimum": 1 } } },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "all": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/predicate" } },
+        "any": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/predicate" } },
+        "not": { "$ref": "#/$defs/predicate" },
+        "capability": { "$ref": "#/$defs/identifier" },
+        "capability_in": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/identifier" } },
+        "user": { "type": "string", "minLength": 1 },
+        "user_in": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "trusted_user": { "type": "boolean" },
+        "risk": { "type": "string", "minLength": 1 },
+        "risk_in": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "metadata_exists": { "type": "string", "minLength": 1 },
+        "metadata_equals": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string" } },
+        "service_healthy": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service", "provider"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "when": { "$ref": "#/$defs/predicate" },
+        "capability": { "$ref": "#/$defs/identifier" },
+        "service": { "$ref": "#/$defs/identifier" },
+        "provider": { "$ref": "#/$defs/identifier" },
+        "fallback_providers": { "type": "array", "items": { "$ref": "#/$defs/identifier" } },
+        "trusted": { "type": "boolean" },
+        "deny_reason": { "type": "string", "minLength": 1 },
+        "audit": { "$ref": "#/$defs/auditClass" },
+        "allow_streaming": { "type": "boolean" },
+        "allow_tools": { "type": "boolean" },
+        "allow_images": { "type": "boolean" },
+        "max_tokens": { "type": "integer", "minimum": 1 },
+        "max_body_bytes": { "type": "integer", "minimum": 1 },
+        "disabled_by_default": { "type": "boolean" },
+        "disabled_reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "deny": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "when": { "$ref": "#/$defs/predicate" },
+        "capability": { "$ref": "#/$defs/identifier" },
+        "reason": { "type": "string", "minLength": 1 },
+        "audit": { "$ref": "#/$defs/auditClass" }
+      }
+    },
+    "auditRule": { "type": "object", "additionalProperties": false, "required": ["contains", "class"], "properties": { "contains": { "type": "string", "minLength": 1 }, "class": { "$ref": "#/$defs/auditClass" } } },
+    "limit": { "type": "object", "additionalProperties": false, "required": ["capability"], "properties": { "capability": { "$ref": "#/$defs/identifier" }, "allow_streaming": { "type": "boolean" }, "allow_tools": { "type": "boolean" }, "allow_images": { "type": "boolean" }, "max_tokens": { "type": "integer", "minimum": 1 }, "max_body_bytes": { "type": "integer", "minimum": 1 } } },
+    "declarativeTest": { "type": "object", "additionalProperties": false, "required": ["name", "request", "expect"], "properties": { "name": { "type": "string", "minLength": 1 }, "request": { "$ref": "#/$defs/testRequest" }, "expect": { "$ref": "#/$defs/testExpectation" } } },
+    "testRequest": { "type": "object", "additionalProperties": false, "required": ["capability"], "properties": { "id": { "type": "string" }, "user": { "type": "string" }, "channel": { "type": "string" }, "capability": { "$ref": "#/$defs/identifier" }, "risk": { "type": "string" }, "metadata": { "type": "object", "additionalProperties": { "type": "string" } } } },
+    "testExpectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": { "type": "boolean" },
+        "service": { "$ref": "#/$defs/identifier" },
+        "provider": { "$ref": "#/$defs/identifier" },
+        "audit": { "$ref": "#/$defs/auditClass" },
+        "rule_id": { "type": "string" },
+        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "retry": { "$ref": "#/$defs/retry" },
+        "breaker": { "$ref": "#/$defs/breaker" },
+        "requires_audit": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "reason_contains": { "type": "string" },
+        "fallback_services": { "type": "array", "items": { "$ref": "#/$defs/identifier" } },
+        "fallback_providers": { "type": "array", "items": { "$ref": "#/$defs/identifier" } },
+        "trace_contains": { "type": "array", "items": { "type": "string" } },
+        "trace_not_contains": { "type": "array", "items": { "type": "string" } },
+        "explain_contains": { "type": "array", "items": { "type": "string" } },
+        "explain_not_contains": { "type": "array", "items": { "type": "string" } },
+        "limits": { "$ref": "#/$defs/expectedLimits" }
+      }
+    },
+    "expectedLimits": { "type": "object", "additionalProperties": false, "properties": { "allow_stream": { "type": "boolean" }, "allow_tools": { "type": "boolean" }, "allow_images": { "type": "boolean" }, "max_tokens": { "type": "integer", "minimum": 0 }, "max_body_bytes": { "type": "integer", "minimum": 0 } } },
+    "derivedFacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version"],
+      "properties": {
+        "version": { "const": "cervorules.facts/v1" },
+        "schema": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/factPredicate" }
+        },
+        "constraints": { "type": "array", "items": { "$ref": "#/$defs/factConstraint" } },
+        "rules": { "type": "array", "items": { "$ref": "#/$defs/factRule" } },
+        "aggregates": { "type": "array", "items": { "$ref": "#/$defs/factAggregate" } },
+        "eval": { "$ref": "#/$defs/factEval" }
+      }
+    },
+    "factPredicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "terms": { "type": "array", "items": { "$ref": "#/$defs/factTermDefinition" } }
+      }
+    },
+    "factTermDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["string", "int", "bool", "enum", "time", "duration"] },
+        "values": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+    "factConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["max_facts_per_key", "mutually_exclusive"] },
+        "predicate": { "type": "string", "minLength": 1 },
+        "predicates": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "key_terms": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "max": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "factRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "head"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "stratum": { "type": "integer", "minimum": 0 },
+        "head": { "$ref": "#/$defs/factPattern" },
+        "body": { "type": "array", "items": { "$ref": "#/$defs/factPattern" } }
+      }
+    },
+    "factAggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "source", "output"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["count", "min", "max", "sum", "exists"] },
+        "source": { "type": "string", "minLength": 1 },
+        "output": { "type": "string", "minLength": 1 },
+        "group_terms": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "value_term": { "type": "integer", "minimum": 0 },
+        "stratum": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "factPattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["predicate"],
+      "properties": {
+        "predicate": { "type": "string", "minLength": 1 },
+        "not": { "type": "boolean" },
+        "terms": { "type": "array", "items": { "$ref": "#/$defs/factTerm" } }
+      }
+    },
+    "factTerm": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        { "required": ["const"], "not": { "required": ["var"] } },
+        { "required": ["var"], "not": { "required": ["const"] } }
+      ],
+      "properties": {
+        "const": { "type": "string" },
+        "var": { "type": "string", "minLength": 1 }
+      }
+    },
+    "factEval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_iterations": { "type": "integer", "minimum": 1 },
+        "max_facts": { "type": "integer", "minimum": 1 },
+        "max_bindings": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

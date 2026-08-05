@@ -1,0 +1,26 @@
+{
+  "schema_version": "cervorules.v3.public_api_inventory.v1",
+  "module": "github.com/cervantesh/cervo-rules/v3",
+  "packages": [
+    {
+      "path": "github.com/cervantesh/cervo-rules/v3/core",
+      "owns": ["decision runtime contracts", "operation/target/executor primitives"],
+      "public_types": ["Operation", "Target", "Executor", "Request", "Decision", "DecisionResult", "DecisionOptions", "Engine", "Error", "Errors", "RoutingPlan"]
+    },
+    {
+      "path": "github.com/cervantesh/cervo-rules/v3/runtime",
+      "owns": ["generated policy factory contracts", "runtime config contracts"],
+      "public_types": ["PolicyFactory", "PolicyMetadata", "PolicyRuntimeConfig"]
+    },
+    {
+      "path": "github.com/cervantesh/cervo-rules/v3/facts",
+      "owns": ["optional facts engine contracts"],
+      "public_types": ["EvalOptions", "EvaluationPlan", "ComplexityDiagnostic", "Result", "Fact", "Pattern"]
+    },
+    {
+      "path": "github.com/cervantesh/cervo-rules/v3/observe",
+      "owns": ["operational report contracts"],
+      "public_types": ["PolicyEvaluationReport"]
+    }
+  ]
+}

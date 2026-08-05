@@ -1,0 +1,3 @@
+dist-performance-profiles/
+dist-performance-report/
+*.pprof

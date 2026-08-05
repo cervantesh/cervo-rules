@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cervantesh/cervo-rules/schemas/v3/agent-manifest.schema.json",
+  "title": "CervoRules v3 Agent Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project", "modules", "contracts"],
+  "properties": {
+    "schema_version": { "const": "cervorules.v3.agent_manifest.v1" },
+    "project": { "const": "CervoRules" },
+    "modules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v2", "v3"],
+      "properties": {
+        "v2": { "type": "string" },
+        "v3": { "type": "string" }
+      }
+    },
+    "contracts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    }
+  }
+}

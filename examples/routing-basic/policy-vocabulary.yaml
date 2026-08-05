@@ -1,0 +1,7 @@
+operations:
+  message_create: {}
+  file_render: {}
+targets:
+  message_worker: {}
+executors:
+  standard_executor: {}

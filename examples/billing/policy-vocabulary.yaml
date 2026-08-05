@@ -1,0 +1,11 @@
+operations:
+  invoice_read: {}
+  payment_capture: {}
+  refund_issue: {}
+targets:
+  ledger_api: {}
+  payment_gateway: {}
+executors:
+  ledger_cluster: {}
+  processor_primary: {}
+  processor_backup: {}

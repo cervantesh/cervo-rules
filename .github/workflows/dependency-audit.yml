@@ -1,0 +1,47 @@
+name: Dependency Audit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        run: bash scripts/ci/setup-go-ci.sh
+
+      - name: List modules
+        run: go list -m all
+
+      - name: Verify modules
+        run: go mod verify
+
+      - name: Test
+        run: go test -count=1 ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Install govulncheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          go_bin="$(go env GOPATH)/bin"
+          echo "${go_bin}" >> "${GITHUB_PATH}"
+          if ! command -v govulncheck >/dev/null 2>&1; then
+            go install golang.org/x/vuln/cmd/govulncheck@latest
+          fi
+
+      - name: Run govulncheck
+        run: govulncheck ./...

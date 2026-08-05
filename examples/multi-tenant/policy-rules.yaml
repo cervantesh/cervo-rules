@@ -1,0 +1,21 @@
+version: cervorules.policy.v3
+name: multi-tenant.v3
+defaults:
+  executor: internal
+routes:
+  - id: tenant_admin
+    operation: tenant_admin
+    target: tenant_api
+    executor: internal
+  - id: tenant_read
+    operation: tenant_read
+    target: tenant_api
+    executor: internal
+tests:
+  - name: tenant_admin routes
+    request:
+      operation: tenant_admin
+    expect:
+      allow: true
+      target: tenant_api
+      executor: internal

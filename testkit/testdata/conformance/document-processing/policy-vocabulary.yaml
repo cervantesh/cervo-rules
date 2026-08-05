@@ -1,0 +1,6 @@
+operations:
+  - document.process
+targets:
+  - document-worker
+executors:
+  - worker-primary

@@ -1,0 +1,6 @@
+version: cervorules.policy.v3
+name: queue-event-routing.v3
+routes:
+  - operation: queue.consume
+    target: queue-worker
+    executor: primary

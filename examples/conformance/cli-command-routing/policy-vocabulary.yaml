@@ -1,0 +1,6 @@
+operations:
+  cli.execute: {}
+targets:
+  cli-runner: {}
+executors:
+  primary: {}

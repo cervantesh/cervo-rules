@@ -1,0 +1,27 @@
+{
+  "$schema": "../schemas/task-recipe.schema.json",
+  "id": "run-conformance",
+  "goal": "Run consumer conformance checks for generated policies or repo fixtures.",
+  "when_to_use": "Use after generation, before release, or when validating a new consumer integration.",
+  "inputs": [
+    "testkit.ConsumerConformanceContract",
+    "generated policy package",
+    "runtime cases",
+    "facts cases"
+  ],
+  "outputs": [
+    "Go test result",
+    "contract failure details"
+  ],
+  "commands": [
+    "go test -run TestConsumerConformance -count=1 ./...",
+    "go test -run TestGeneratedRuntimePolicy -count=1 ./..."
+  ],
+  "checks": [
+    "go test -count=1 ./..."
+  ],
+  "failure_mode": "Fail the task if generated policy behavior differs from the declared contract.",
+  "notes": [
+    "Use testkit.CheckConsumerConformance from smoke tools when testing.TB is unavailable."
+  ]
+}

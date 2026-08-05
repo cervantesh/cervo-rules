@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cervantesh/cervo-rules/schemas/v1/policy-vocabulary.schema.json",
+  "title": "CervoRules policy vocabulary v1",
+  "description": "Closed schema for policy-vocabulary.yaml/json files consumed by cervorules-vocabgen.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "capabilities": {
+      "$ref": "#/$defs/vocabularyMap",
+      "description": "Caller-owned capability names that requests can ask for."
+    },
+    "services": {
+      "$ref": "#/$defs/vocabularyMap",
+      "description": "Caller-owned service names that policies can route to."
+    },
+    "providers": {
+      "$ref": "#/$defs/vocabularyMap",
+      "description": "Caller-owned provider names that policies can use as primary or fallback providers."
+    }
+  },
+  "anyOf": [
+    { "required": ["capabilities"] },
+    { "required": ["services"] },
+    { "required": ["providers"] }
+  ],
+  "$defs": {
+    "vocabularyMap": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/vocabularyEntry"
+      }
+    },
+    "vocabularyEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable purpose for agents and reviewers."
+        },
+        "go_name": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+          "description": "Optional exported Go identifier suffix used by code generation."
+        }
+      }
+    }
+  }
+}

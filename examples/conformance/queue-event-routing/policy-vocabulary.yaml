@@ -1,0 +1,6 @@
+operations:
+  queue.consume: {}
+targets:
+  queue-worker: {}
+executors:
+  primary: {}

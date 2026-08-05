@@ -1,0 +1,6 @@
+operations:
+  - job.run
+targets:
+  - scheduler
+executors:
+  - scheduler-primary
