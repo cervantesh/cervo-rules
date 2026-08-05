@@ -3,6 +3,7 @@ package policygen
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -28,10 +29,27 @@ func renderPolicySource(options Options, importRoot string, policy loadedPolicy,
 	fmt.Fprintln(&b)
 	writeMetadata(&b, meta)
 	writeDefaultConfig(&b, policy.spec)
-	writeValidateConfig(&b, options.VocabularyPackage)
+	writeValidateConfig(&b, options.VocabularyPackage, policy.spec)
 	writeBuild(&b, policy.spec)
 	writeEngine(&b)
 	return b.String(), nil
+}
+
+// conditionLiteral renders a rule's required condition names as Go source.
+func conditionLiteral(requires []string) string {
+	if len(requires) == 0 {
+		return "nil"
+	}
+	var b strings.Builder
+	b.WriteString("[]cervorules.Condition{")
+	for i, name := range requires {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(&b, "cervorules.Condition(%q)", normalize(name))
+	}
+	b.WriteString("}")
+	return b.String()
 }
 
 func writeMetadata(b *bytes.Buffer, meta PolicyMetadata) {
@@ -85,10 +103,24 @@ func writeDefaultConfig(b *bytes.Buffer, policy policySpec) {
 	fmt.Fprintln(b)
 }
 
-func writeValidateConfig(b *bytes.Buffer, vocabPackage string) {
+func writeValidateConfig(b *bytes.Buffer, vocabPackage string, policy policySpec) {
 	fmt.Fprintln(b, "func (PolicyFactory) ValidateConfig(cfg cervoruntime.PolicyRuntimeConfig) error {")
 	fmt.Fprintf(b, "vocab := %s.Vocabulary()\n", vocabPackage)
 	fmt.Fprintln(b, "var errs cervorules.Errors")
+	if names := sortedConditionNames(policy); len(names) > 0 {
+		// A policy that declares guards but is built without an evaluator would
+		// silently allow everything those guards were meant to stop.
+		fmt.Fprintln(b, "if cfg.Conditions == nil {")
+		fmt.Fprintln(b, "errs = append(errs, cervorules.Error{")
+		fmt.Fprintln(b, "Code: cervorules.ErrorCodeMissingConditions,")
+		fmt.Fprintln(b, "Severity: cervorules.SeverityFatal,")
+		fmt.Fprintln(b, "Component: \"policy\",")
+		fmt.Fprintln(b, "Field: \"conditions\",")
+		fmt.Fprintf(b, "Reason: %q,\n", "policy declares "+strconv.Itoa(len(names))+" condition(s) but no evaluator is configured")
+		fmt.Fprintf(b, "Suggestion: %q,\n", "set PolicyRuntimeConfig.Conditions before building this policy")
+		fmt.Fprintln(b, "})")
+		fmt.Fprintln(b, "}")
+	}
 	fmt.Fprintln(b, "if cfg.DefaultExecutor != \"\" {")
 	fmt.Fprintln(b, "errs = appendRuntimeValidationError(errs, vocab.ValidateExecutor(cfg.DefaultExecutor), \"defaults.executor\")")
 	fmt.Fprintln(b, "}")
@@ -144,7 +176,7 @@ func writeBuild(b *bytes.Buffer, policy policySpec) {
 		if strings.TrimSpace(reason) == "" {
 			reason = "route matched"
 		}
-		fmt.Fprintf(b, "cervorules.Operation(%q): {target: cervorules.Target(%q), executor: cervorules.Executor(%q), reason: %q, requiresTrustedUser: %t},\n", normalize(route.Operation), normalize(route.Target), generatedRouteExecutor(policy, route), reason, route.RequiresTrustedUser)
+		fmt.Fprintf(b, "cervorules.Operation(%q): {target: cervorules.Target(%q), executor: cervorules.Executor(%q), reason: %q, requiresTrustedUser: %t, requires: %s},\n", normalize(route.Operation), normalize(route.Target), generatedRouteExecutor(policy, route), reason, route.RequiresTrustedUser, conditionLiteral(route.Requires))
 	}
 	fmt.Fprintln(b, "}")
 	fmt.Fprintln(b, "disabledRoutes := map[cervorules.Operation]generatedRoute{")
@@ -156,7 +188,7 @@ func writeBuild(b *bytes.Buffer, policy policySpec) {
 		if strings.TrimSpace(reason) == "" {
 			reason = "runtime override"
 		}
-		fmt.Fprintf(b, "cervorules.Operation(%q): {target: cervorules.Target(%q), executor: cervorules.Executor(%q), reason: %q, requiresTrustedUser: %t},\n", normalize(route.Operation), normalize(route.Target), generatedRouteExecutor(policy, route), reason, route.RequiresTrustedUser)
+		fmt.Fprintf(b, "cervorules.Operation(%q): {target: cervorules.Target(%q), executor: cervorules.Executor(%q), reason: %q, requiresTrustedUser: %t, requires: %s},\n", normalize(route.Operation), normalize(route.Target), generatedRouteExecutor(policy, route), reason, route.RequiresTrustedUser, conditionLiteral(route.Requires))
 	}
 	fmt.Fprintln(b, "}")
 	fmt.Fprintln(b, "trustedUsers := map[string]struct{}{}")
@@ -183,12 +215,12 @@ func writeBuild(b *bytes.Buffer, policy policySpec) {
 		fmt.Fprintf(b, "cervorules.Operation(%q): %q,\n", normalize(route.Operation), reason)
 	}
 	fmt.Fprintln(b, "}")
-	fmt.Fprintln(b, "denies := map[cervorules.Operation]string{")
+	fmt.Fprintln(b, "denies := map[cervorules.Operation]generatedDeny{")
 	for _, deny := range policy.Denies {
-		fmt.Fprintf(b, "cervorules.Operation(%q): %q,\n", normalize(deny.Operation), deny.Reason)
+		fmt.Fprintf(b, "cervorules.Operation(%q): {reason: %q, requires: %s},\n", normalize(deny.Operation), deny.Reason, conditionLiteral(deny.Requires))
 	}
 	fmt.Fprintln(b, "}")
-	fmt.Fprintln(b, "return generatedEngine{routes: routes, denies: denies, disabledDenies: disabledDenies, trustedUsers: trustedUsers, defaultExecutor: cfg.DefaultExecutor, executorFallbacks: cfg.ExecutorFallbacks}, nil")
+	fmt.Fprintln(b, "return generatedEngine{routes: routes, denies: denies, disabledDenies: disabledDenies, trustedUsers: trustedUsers, defaultExecutor: cfg.DefaultExecutor, executorFallbacks: cfg.ExecutorFallbacks, conditions: cfg.Conditions}, nil")
 	fmt.Fprintln(b, "}")
 	fmt.Fprintln(b)
 	writeMergeConfig(b)
@@ -218,15 +250,22 @@ func writeEngine(b *bytes.Buffer) {
 	fmt.Fprintln(b, "executor cervorules.Executor")
 	fmt.Fprintln(b, "reason string")
 	fmt.Fprintln(b, "requiresTrustedUser bool")
+	fmt.Fprintln(b, "requires []cervorules.Condition")
+	fmt.Fprintln(b, "}")
+	fmt.Fprintln(b)
+	fmt.Fprintln(b, "type generatedDeny struct {")
+	fmt.Fprintln(b, "reason string")
+	fmt.Fprintln(b, "requires []cervorules.Condition")
 	fmt.Fprintln(b, "}")
 	fmt.Fprintln(b)
 	fmt.Fprintln(b, "type generatedEngine struct {")
 	fmt.Fprintln(b, "routes map[cervorules.Operation]generatedRoute")
-	fmt.Fprintln(b, "denies map[cervorules.Operation]string")
+	fmt.Fprintln(b, "denies map[cervorules.Operation]generatedDeny")
 	fmt.Fprintln(b, "disabledDenies map[cervorules.Operation]string")
 	fmt.Fprintln(b, "trustedUsers map[string]struct{}")
 	fmt.Fprintln(b, "defaultExecutor cervorules.Executor")
 	fmt.Fprintln(b, "executorFallbacks map[cervorules.Executor][]cervorules.Executor")
+	fmt.Fprintln(b, "conditions cervorules.Conditions")
 	fmt.Fprintln(b, "}")
 	fmt.Fprintln(b)
 	fmt.Fprintln(b, "func (e generatedEngine) Decide(ctx context.Context, req cervorules.Request) (cervorules.DecisionResult, error) {")
@@ -239,8 +278,12 @@ func writeEngine(b *bytes.Buffer) {
 	fmt.Fprintln(b, "return cervorules.DecisionResult{}, ctx.Err()")
 	fmt.Fprintln(b, "default:")
 	fmt.Fprintln(b, "}")
-	fmt.Fprintln(b, "if reason, denied := e.denies[req.Operation]; denied {")
-	fmt.Fprintln(b, "return cervorules.NewDecisionResult(req, cervorules.Decision{Allow: false, Reason: reason}, cervorules.WithTrace(options.TraceEnabled()), cervorules.WithObservation(options.ObservationEnabled())), nil")
+	fmt.Fprintln(b, "if deny, denied := e.denies[req.Operation]; denied {")
+	fmt.Fprintln(b, "applies, err := e.conditionsHold(ctx, deny.requires, req)")
+	fmt.Fprintln(b, "if err != nil { return cervorules.DecisionResult{}, err }")
+	fmt.Fprintln(b, "if applies {")
+	fmt.Fprintln(b, "return cervorules.NewDecisionResult(req, cervorules.Decision{Allow: false, Reason: deny.reason}, cervorules.WithTrace(options.TraceEnabled()), cervorules.WithObservation(options.ObservationEnabled())), nil")
+	fmt.Fprintln(b, "}")
 	fmt.Fprintln(b, "}")
 	fmt.Fprintln(b, "route, ok := e.routes[req.Operation]")
 	fmt.Fprintln(b, "if !ok {")
@@ -252,10 +295,31 @@ func writeEngine(b *bytes.Buffer) {
 	fmt.Fprintln(b, "if route.requiresTrustedUser && !e.isTrustedUser(req.User) {")
 	writeLine(b, `return cervorules.NewDecisionResult(req, cervorules.Decision{Allow: false, Reason: fmt.Sprintf("operation %s requires trusted user", req.Operation)}, cervorules.WithTrace(options.TraceEnabled()), cervorules.WithObservation(options.ObservationEnabled())), nil`)
 	fmt.Fprintln(b, "}")
+	fmt.Fprintln(b, "eligible, err := e.conditionsHold(ctx, route.requires, req)")
+	fmt.Fprintln(b, "if err != nil { return cervorules.DecisionResult{}, err }")
+	fmt.Fprintln(b, "if !eligible {")
+	writeLine(b, `return cervorules.NewDecisionResult(req, cervorules.Decision{Allow: false, Reason: fmt.Sprintf("operation %s did not satisfy its required conditions", req.Operation)}, cervorules.WithTrace(options.TraceEnabled()), cervorules.WithObservation(options.ObservationEnabled())), nil`)
+	fmt.Fprintln(b, "}")
 	fmt.Fprintln(b, "executor := route.executor")
 	fmt.Fprintln(b, "if executor == \"\" { executor = e.defaultExecutor }")
 	fmt.Fprintln(b, "decision := cervorules.Decision{Allow: true, Target: route.target, Executor: executor, FallbackExecutors: append([]cervorules.Executor(nil), e.executorFallbacks[executor]...), Reason: route.reason}")
 	fmt.Fprintln(b, "return cervorules.NewDecisionResult(req, decision, cervorules.WithTrace(options.TraceEnabled()), cervorules.WithObservation(options.ObservationEnabled())), nil")
+	fmt.Fprintln(b, "}")
+	fmt.Fprintln(b)
+	fmt.Fprintln(b, "// conditionsHold reports whether every required condition holds.")
+	fmt.Fprintln(b, "// A condition that cannot be answered fails the decision instead of being")
+	fmt.Fprintln(b, "// treated as a non-match, so an unanswerable guard never silently passes.")
+	fmt.Fprintln(b, "func (e generatedEngine) conditionsHold(ctx context.Context, required []cervorules.Condition, req cervorules.Request) (bool, error) {")
+	fmt.Fprintln(b, "if len(required) == 0 { return true, nil }")
+	fmt.Fprintln(b, "if e.conditions == nil {")
+	fmt.Fprintln(b, "return false, cervorules.Error{Code: cervorules.ErrorCodeMissingConditions, Severity: cervorules.SeverityFatal, Component: \"policy\", Field: \"conditions\", Reason: \"policy requires conditions but no evaluator is configured\"}")
+	fmt.Fprintln(b, "}")
+	fmt.Fprintln(b, "for _, condition := range required {")
+	fmt.Fprintln(b, "holds, err := e.conditions.Holds(ctx, condition, req)")
+	fmt.Fprintln(b, "if err != nil { return false, err }")
+	fmt.Fprintln(b, "if !holds { return false, nil }")
+	fmt.Fprintln(b, "}")
+	fmt.Fprintln(b, "return true, nil")
 	fmt.Fprintln(b, "}")
 	fmt.Fprintln(b)
 	fmt.Fprintln(b, "func (e generatedEngine) isTrustedUser(user string) bool {")

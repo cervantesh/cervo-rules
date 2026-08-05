@@ -31,8 +31,36 @@ type Error struct {
 ```
 
 `Cause` is available for `errors.Is` and `errors.As`, but it is never serialized
-to JSON. `Value` is redacted by default in JSON when the field name indicates
-sensitive material such as token, auth, header, body, prompt, content or memory.
+to JSON.
+
+`Value` is withheld when the producer marks the error `Sensitive`. That marker
+is honored by `Redacted`, by `MarshalJSON` and by `Error()`, so a secret does
+not leak through a log line that formats the error as a string:
+
+```go
+core.Error{Code: code, Field: "credential", Value: raw, Sensitive: true}
+```
+
+`core` never infers sensitivity from a field name. Which names are secret is a
+property of the consumer's domain, so each consumer or adapter supplies its own
+vocabulary at the serialization boundary:
+
+```go
+redactor := core.RedactFields("credential", "secret", "authorization")
+payload := errs.RedactWith(redactor)
+```
+
+`RedactFields` compares whole segments, splitting on `.`, `_`, `[` and `]`, so a
+field such as `max_tokens` is not withheld merely for containing `token`.
+
+HTTP consumers can use the adapter's own vocabulary:
+
+```go
+payload := errs.RedactWith(httpadapter.Redactor())
+```
+
+See [ADR 0015](adr/0015-caller-owned-error-redaction.md) for the rationale and
+the migration from the previous name-based behavior.
 
 Use `core.Errors` when multiple failures can be reported together:
 

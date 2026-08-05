@@ -1,0 +1,39 @@
+version: cervorules.policy.v3
+name: guarded_refund
+
+defaults:
+  executor: primary
+
+# Named guards. The policy references them by name only; what a name means is
+# bound in Go, so the same policy text works against an ontology guard, a plain
+# core.ConditionSet, or a fake in tests.
+conditions:
+  refund_transition_legal:
+    kind: transition_allowed
+    lifecycle: order
+    subject_key: order_id
+    to: refunded
+    description: The order may still move to refunded.
+
+  ship_transition_legal:
+    kind: transition_allowed
+    lifecycle: order
+    subject_key: order_id
+    to: shipped
+    description: The order may still move to shipped.
+
+routes:
+  # Routing alone cannot express "refund, but only once". The requirement is
+  # what makes a second refund structurally impossible rather than something a
+  # caller has to remember to check.
+  - id: refund_route
+    operation: refund
+    target: ledger
+    executor: primary
+    requires: [refund_transition_legal]
+
+  - id: ship_route
+    operation: ship
+    target: fulfilment
+    executor: primary
+    requires: [ship_transition_legal]

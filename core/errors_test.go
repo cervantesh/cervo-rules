@@ -100,45 +100,88 @@ func TestStructuredErrorJSONContractHidesCause(t *testing.T) {
 	assertJSONField(t, decoded, "suggestion", "reduce fanout or raise the budget")
 }
 
-func TestStructuredErrorJSONRedactsSensitiveValuesByDefault(t *testing.T) {
-	for _, field := range []string{"token", "auth_header", "request_body", "prompt", "content", "memory"} {
+func TestStructuredErrorJSONRedactsExplicitlySensitiveValues(t *testing.T) {
+	raw, err := json.Marshal(Error{
+		Code:      ErrorCodeInvalidConfig,
+		Field:     "credential",
+		Value:     "secret-value",
+		Reason:    "invalid sensitive value",
+		Sensitive: true,
+	})
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+	encoded := string(raw)
+	if strings.Contains(encoded, "secret-value") {
+		t.Fatalf("sensitive value leaked: %s", encoded)
+	}
+	if !strings.Contains(encoded, `"value":"[REDACTED]"`) {
+		t.Fatalf("redacted marker missing: %s", encoded)
+	}
+}
+
+// core must not infer sensitivity from a field name. Guessing is what made
+// "max_tokens" collide with "token" and hid a legitimate limit value.
+func TestStructuredErrorJSONDoesNotGuessFromFieldName(t *testing.T) {
+	for _, field := range []string{"prompt", "content", "memory", "max_tokens", "request_body"} {
 		t.Run(field, func(t *testing.T) {
-			raw, err := json.Marshal(Error{
-				Code:   ErrorCodeInvalidConfig,
-				Field:  field,
-				Value:  "secret-value",
-				Reason: "invalid sensitive value",
-			})
+			raw, err := json.Marshal(Error{Code: ErrorCodeInvalidConfig, Field: field, Value: "1001"})
 			if err != nil {
 				t.Fatalf("marshal error: %v", err)
 			}
-			encoded := string(raw)
-			if strings.Contains(encoded, "secret-value") {
-				t.Fatalf("sensitive value leaked for field %q: %s", field, encoded)
-			}
-			if !strings.Contains(encoded, `"value":"[REDACTED]"`) {
-				t.Fatalf("redacted marker missing for field %q: %s", field, encoded)
+			if !strings.Contains(string(raw), `"value":"1001"`) {
+				t.Fatalf("core must not redact %q by name: %s", field, raw)
 			}
 		})
 	}
 }
 
-func TestStructuredErrorRedactedPreservesNonSensitiveValues(t *testing.T) {
+func TestErrorStringWithholdsSensitiveValue(t *testing.T) {
+	err := Error{Code: ErrorCodeInvalidConfig, Field: "credential", Value: "secret-value", Sensitive: true}
+	if strings.Contains(err.Error(), "secret-value") {
+		t.Fatalf("sensitive value leaked through Error(): %s", err.Error())
+	}
+}
+
+func TestRedactWithAppliesCallerOwnedFieldPolicy(t *testing.T) {
+	redactor := RedactFields("token", "auth", "header")
+	errs := Errors{
+		{Code: ErrorCodeInvalidConfig, Field: "token", Value: "secret"},
+		{Code: ErrorCodeInvalidConfig, Field: "auth_header", Value: "Bearer abc"},
+		{Code: ErrorCodeInvalidConfig, Field: "operation", Value: "read"},
+		{Code: ErrorCodeMaxTokensExceeded, Field: "max_tokens", Value: "4096"},
+	}.RedactWith(redactor)
+
+	if errs[0].Value != RedactedValue {
+		t.Fatalf("token should be redacted, got %q", errs[0].Value)
+	}
+	if errs[1].Value != RedactedValue {
+		t.Fatalf("auth_header should be redacted, got %q", errs[1].Value)
+	}
+	if errs[2].Value != "read" {
+		t.Fatalf("operation should be preserved, got %q", errs[2].Value)
+	}
+	// The regression that motivated segment matching: "max_tokens" is not a
+	// secret just because it contains the substring "token".
+	if errs[3].Value != "4096" {
+		t.Fatalf("max_tokens must not match token, got %q", errs[3].Value)
+	}
+}
+
+func TestRedactedPreservesNonSensitiveValues(t *testing.T) {
 	err := Error{Code: ErrorCodeInvalidConfig, Field: "operation", Value: "read", Reason: "bad operation"}
 	if got := err.Redacted().Value; got != "read" {
 		t.Fatalf("non-sensitive value should be preserved, got %q", got)
 	}
-	err.Field = "authorization"
-	if got := err.Redacted().Value; got != "[REDACTED]" {
+	err.Sensitive = true
+	if got := err.Redacted().Value; got != RedactedValue {
 		t.Fatalf("sensitive value should be redacted, got %q", got)
 	}
+}
 
-	errs := Errors{
-		{Code: ErrorCodeInvalidConfig, Field: "token", Value: "secret"},
-		{Code: ErrorCodeInvalidConfig, Field: "operation", Value: "read"},
-	}.Redacted()
-	if errs[0].Value != "[REDACTED]" || errs[1].Value != "read" {
-		t.Fatalf("unexpected redacted collection: %#v", errs)
+func TestEmptyRedactorMatchesNothing(t *testing.T) {
+	if RedactFields()("token") {
+		t.Fatal("an empty redactor must not match")
 	}
 }
 

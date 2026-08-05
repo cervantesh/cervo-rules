@@ -101,3 +101,21 @@ func (fakeEngine) Decide(ctx context.Context, req core.Request) (core.DecisionRe
 func (fakeEngine) DecideWithOptions(_ context.Context, req core.Request, _ core.DecisionOptions) (core.DecisionResult, error) {
 	return core.NewDecisionResult(req, core.Decision{Allow: true, Target: "queue", Executor: "primary"}), nil
 }
+
+func TestPolicyRuntimeConfigCarriesConditions(t *testing.T) {
+	set := core.ConditionSet{
+		"always": func(context.Context, core.Request) (bool, error) { return true, nil },
+	}
+	cfg := PolicyRuntimeConfig{Conditions: set}
+	clone := cfg.Clone()
+	if clone.Conditions == nil {
+		t.Fatal("Clone must carry the condition evaluator")
+	}
+	holds, err := clone.Conditions.Holds(context.Background(), "always", core.Request{})
+	if err != nil || !holds {
+		t.Fatalf("cloned evaluator did not answer: %v %v", holds, err)
+	}
+	if _, err := clone.Conditions.Holds(context.Background(), "missing", core.Request{}); err == nil {
+		t.Fatal("an unregistered condition must fail closed")
+	}
+}

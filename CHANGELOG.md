@@ -2,7 +2,57 @@
 
 All notable changes to CervoRules will be documented in this file.
 
-## Unreleased
+## v3.0.0-rc.4 - 2026-08-05
+
+### Added
+
+- Added the optional `ontology` package: a symbolic guard layer with entity
+  types, predicate domain/range signatures, disjoint type sets, functional
+  properties, and declarative lifecycles with terminal-state detection. See
+  [ADR 0014](docs/adr/0014-symbolic-guard-layer.md).
+- Added `core.Condition`, `core.Conditions`, `core.ConditionFunc` and
+  `core.ConditionSet`: a named-guard seam a policy can consult before allowing
+  an operation. Unknown or unwired conditions fail closed with a structured
+  error rather than reporting `false`.
+- Added `ontology.Guard`, which implements `core.Conditions` over an ontology
+  and a caller-supplied snapshot resolver. `Guard.Explain` returns the
+  violations behind a refusal; `Holds` returns the same answer without them.
+- Added `conditions` and `requires` to the v3 policy DSL. A route or deny lists
+  the named guards that must hold for it to apply, and `policygen` rejects a
+  rule requiring an undeclared condition at generation time, so an unwired guard
+  fails CI instead of a production decision.
+- Added `runtime.PolicyRuntimeConfig.Conditions`. A generated policy that
+  declares conditions but is built without an evaluator is rejected by
+  `ValidateConfig` rather than silently allowing what the guards exist to stop.
+- Added `ontology.WithRequestScope`, which resolves one snapshot per request
+  instead of one per consulted condition, and refuses reuse across requests.
+- Added `ontology.Constraint` and `Ontology.Custom` so consumers can add
+  constraint families without waiting for upstream.
+- Added the `guarded-refund` example and
+  [docs/v3/symbolic-guards.md](docs/v3/symbolic-guards.md).
+
+### Changed
+
+- **Breaking behavior change.** `core.Error` no longer infers value sensitivity
+  from the field name. Redaction is now explicit via the `Sensitive` marker, or
+  caller-owned via `core.RedactFields` with `Error.RedactWith` /
+  `Errors.RedactWith`. The previous hardcoded list put HTTP- and AI-shaped
+  vocabulary inside a domain-neutral package. See
+  [ADR 0015](docs/adr/0015-caller-owned-error-redaction.md) for migration.
+- `core.Error.Error()` now withholds a value marked `Sensitive`. Previously the
+  string form printed values that JSON serialization redacted, so logging an
+  error bypassed redaction.
+
+### Fixed
+
+- Fixed a redaction false positive where the field `max_tokens` matched the
+  substring `token` and had its value replaced with `[REDACTED]`, hiding a
+  legitimate limit value. Field matching is now segment-based.
+
+### Added (adapters)
+
+- Added `httpadapter.Redactor()` and `httpadapter.SensitiveFieldNames()` so
+  transport-shaped field names live with the transport adapter that owns them.
 
 ## v3.0.0-rc.3 - 2026-05-24
 

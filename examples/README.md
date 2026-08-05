@@ -11,6 +11,8 @@ Use examples as policy shapes, not as domain vocabulary to copy blindly.
 - `logic-facts`: optional derived facts before policy evaluation.
 - `performance-hot-path`: low-latency request handling with compiled
   singletons and bounded request facts.
+- `guarded-refund`: a named policy condition backed by an ontology lifecycle,
+  for actions that must not be applied twice.
 - `conformance/*`: tiny fixtures for billing, document processing, device
   routing, queue events, scheduled jobs, CLI commands, and edge requests.
 

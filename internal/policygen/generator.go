@@ -60,6 +60,7 @@ type CodegenSnapshot struct {
 	Routes     int    `json:"routes"`
 	Denies     int    `json:"denies"`
 	Tests      int    `json:"tests"`
+	Conditions int    `json:"conditions"`
 }
 
 type vocabularySpec struct {
@@ -81,6 +82,21 @@ type policySpec struct {
 	Routes       []routeSpec  `yaml:"routes"`
 	Denies       []denySpec   `yaml:"denies"`
 	Tests        []testSpec   `yaml:"tests"`
+
+	Conditions map[string]conditionSpec `yaml:"conditions"`
+}
+
+// conditionSpec declares a named guard the policy can require. It mirrors the
+// JSON shape of ontology.Check, but the generator never imports ontology: a
+// condition is only a name plus the data a consumer needs to bind an evaluator.
+type conditionSpec struct {
+	Kind        string   `yaml:"kind"`
+	Lifecycle   string   `yaml:"lifecycle"`
+	SubjectKey  string   `yaml:"subject_key"`
+	To          string   `yaml:"to"`
+	States      []string `yaml:"states"`
+	EntityType  string   `yaml:"entity_type"`
+	Description string   `yaml:"description"`
 }
 
 type defaultsSpec struct {
@@ -96,12 +112,14 @@ type routeSpec struct {
 	DisabledByDefault   bool     `yaml:"disabled_by_default"`
 	DisabledReason      string   `yaml:"disabled_reason"`
 	RequiresTrustedUser bool     `yaml:"requires_trusted_user"`
+	Requires            []string `yaml:"requires"`
 }
 
 type denySpec struct {
-	ID        string `yaml:"id"`
-	Operation string `yaml:"operation"`
-	Reason    string `yaml:"reason"`
+	ID        string   `yaml:"id"`
+	Operation string   `yaml:"operation"`
+	Reason    string   `yaml:"reason"`
+	Requires  []string `yaml:"requires"`
 }
 
 type testSpec struct {
@@ -290,9 +308,21 @@ func validate(vocab vocabularySpec, policy policySpec) error {
 			}
 		}
 	}
+	declaredConditions, err := validateConditions(policy)
+	if err != nil {
+		return err
+	}
+	for _, route := range policy.Routes {
+		if err := validateRequires(declaredConditions, route.Requires, "route", route.ID); err != nil {
+			return err
+		}
+	}
 	for _, deny := range policy.Denies {
 		if strings.TrimSpace(deny.Operation) == "" {
 			return fmt.Errorf("deny %q missing operation", deny.ID)
+		}
+		if err := validateRequires(declaredConditions, deny.Requires, "deny", deny.ID); err != nil {
+			return err
 		}
 	}
 	for _, test := range policy.Tests {
@@ -301,6 +331,71 @@ func validate(vocab vocabularySpec, policy policySpec) error {
 		}
 	}
 	return nil
+}
+
+// validateConditions checks each declared condition carries the fields its kind
+// needs, and returns the set of declared names.
+func validateConditions(policy policySpec) (map[string]struct{}, error) {
+	declared := make(map[string]struct{}, len(policy.Conditions))
+	for name, condition := range policy.Conditions {
+		if strings.TrimSpace(name) == "" {
+			return nil, errors.New("condition name is required")
+		}
+		normalized := normalize(name)
+		switch condition.Kind {
+		case "transition_allowed":
+			if condition.Lifecycle == "" || condition.To == "" || condition.SubjectKey == "" {
+				return nil, fmt.Errorf("condition %q of kind transition_allowed needs lifecycle, to, and subject_key", name)
+			}
+		case "in_state":
+			if condition.Lifecycle == "" || condition.SubjectKey == "" || len(condition.States) == 0 {
+				return nil, fmt.Errorf("condition %q of kind in_state needs lifecycle, subject_key, and states", name)
+			}
+		case "has_type":
+			if condition.EntityType == "" || condition.SubjectKey == "" {
+				return nil, fmt.Errorf("condition %q of kind has_type needs entity_type and subject_key", name)
+			}
+		case "integrity":
+			// Integrity asks about the whole snapshot, so it takes no subject.
+		case "":
+			return nil, fmt.Errorf("condition %q missing kind", name)
+		default:
+			return nil, fmt.Errorf("condition %q has unknown kind %q", name, condition.Kind)
+		}
+		declared[normalized] = struct{}{}
+	}
+	return declared, nil
+}
+
+// validateRequires rejects a rule that requires a condition the policy never
+// declares. Catching it here means an unwired guard fails the build instead of
+// failing a decision in production.
+func validateRequires(declared map[string]struct{}, requires []string, kind, id string) error {
+	seen := make(map[string]struct{}, len(requires))
+	for _, name := range requires {
+		normalized := normalize(name)
+		if normalized == "" {
+			return fmt.Errorf("%s %q requires an empty condition name", kind, id)
+		}
+		if _, ok := declared[normalized]; !ok {
+			return fmt.Errorf("%s %q requires undeclared condition %q", kind, id, name)
+		}
+		if _, ok := seen[normalized]; ok {
+			return fmt.Errorf("%s %q requires condition %q more than once", kind, id, name)
+		}
+		seen[normalized] = struct{}{}
+	}
+	return nil
+}
+
+// sortedConditionNames returns declared condition names in stable order.
+func sortedConditionNames(policy policySpec) []string {
+	out := make([]string, 0, len(policy.Conditions))
+	for name := range policy.Conditions {
+		out = append(out, normalize(name))
+	}
+	sort.Strings(out)
+	return out
 }
 
 func newVocabularyIndex(vocab vocabularySpec) vocabularyIndex {
@@ -356,6 +451,7 @@ func snapshotFor(policy loadedPolicy, vocab loadedVocabulary) CodegenSnapshot {
 		Routes:     len(policy.spec.Routes),
 		Denies:     len(policy.spec.Denies),
 		Tests:      len(policy.spec.Tests),
+		Conditions: len(policy.spec.Conditions),
 	}
 }
 

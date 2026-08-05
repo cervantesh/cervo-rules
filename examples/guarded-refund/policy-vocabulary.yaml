@@ -1,0 +1,13 @@
+operations:
+  refund:
+    description: Refund an order.
+  ship:
+    description: Ship an order.
+targets:
+  ledger:
+    description: Accounting ledger.
+  fulfilment:
+    description: Fulfilment service.
+executors:
+  primary:
+    description: Primary executor.

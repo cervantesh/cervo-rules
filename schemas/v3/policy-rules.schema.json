@@ -11,6 +11,11 @@
     "name": { "$ref": "#/$defs/identifier" },
     "trusted_users": { "type": "array", "items": { "type": "string" } },
     "defaults": { "$ref": "#/$defs/defaults" },
+    "conditions": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/condition" },
+      "description": "Named guards a rule can require. Names are referenced by route and deny `requires` lists; the evaluator is supplied at build time through PolicyRuntimeConfig.Conditions."
+    },
     "routes": { "type": "array", "items": { "$ref": "#/$defs/route" } },
     "denies": { "type": "array", "items": { "$ref": "#/$defs/deny" } },
     "tests": { "type": "array", "items": { "$ref": "#/$defs/testCase" } }
@@ -20,6 +25,27 @@
       "type": "string",
       "minLength": 1,
       "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$"
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["transition_allowed", "in_state", "has_type", "integrity"] },
+        "lifecycle": { "$ref": "#/$defs/identifier" },
+        "subject_key": { "type": "string", "minLength": 1 },
+        "to": { "$ref": "#/$defs/identifier" },
+        "states": { "type": "array", "items": { "$ref": "#/$defs/identifier" }, "minItems": 1 },
+        "entity_type": { "$ref": "#/$defs/identifier" },
+        "description": { "type": "string" }
+      }
+    },
+    "requires": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/identifier" },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Every named condition must hold for this rule to apply. A condition that cannot be answered fails the decision rather than skipping the rule."
     },
     "defaults": {
       "type": "object",
@@ -40,7 +66,8 @@
         "fallback_executors": { "type": "array", "items": { "$ref": "#/$defs/identifier" } },
         "disabled_by_default": { "type": "boolean" },
         "disabled_reason": { "type": "string" },
-        "requires_trusted_user": { "type": "boolean" }
+        "requires_trusted_user": { "type": "boolean" },
+        "requires": { "$ref": "#/$defs/requires" }
       }
     },
     "deny": {
@@ -50,7 +77,8 @@
       "properties": {
         "id": { "$ref": "#/$defs/identifier" },
         "operation": { "$ref": "#/$defs/identifier" },
-        "reason": { "type": "string" }
+        "reason": { "type": "string" },
+        "requires": { "$ref": "#/$defs/requires" }
       }
     },
     "testCase": {
