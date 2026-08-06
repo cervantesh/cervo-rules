@@ -2,6 +2,23 @@
 
 All notable changes to CervoRules will be documented in this file.
 
+## Unreleased
+
+### Security
+
+- Raised the minimum Go toolchain to 1.25.11. `govulncheck` reports GO-2026-5037
+  in `crypto/x509` for go1.25.8, reachable from `limits.Check` through
+  `fmt.Sprintf` to `x509.HostnameError.Error`. The trace is generic -- any
+  `fmt.Sprintf` over an error can reach it -- but the fix is a toolchain bump,
+  so there is nothing to weigh. The `go` directive is the consumer-visible half:
+  a consumer still building with 1.25.8 links the affected standard library.
+
+### Fixed
+
+- The temp consumer module used by generated-policy tests now reads the `go`
+  directive from this module instead of hardcoding it, so a toolchain bump no
+  longer leaves the tests failing with "updates to go.mod needed".
+
 ## v3.0.0-rc.5 - 2026-08-06
 
 ### Added

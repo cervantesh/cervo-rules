@@ -656,7 +656,12 @@ func compileGeneratedPolicy(t *testing.T, source string, testSource string) {
 func compileGeneratedPolicyWithVocab(t *testing.T, vocabGo string, source string, testSource string) {
 	t.Helper()
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "go.mod"), "module example.test/generated\n\ngo 1.25.8\n\nrequire github.com/cervantesh/cervo-rules/v3 v3.0.0\n\nreplace github.com/cervantesh/cervo-rules/v3 => "+filepath.ToSlash(repoRoot(t))+"\n")
+	root := repoRoot(t)
+	// The go directive is read from this module rather than written literally:
+	// a temp consumer declaring an older Go than the module it replaces fails
+	// with "updates to go.mod needed", so a hardcoded version silently rots
+	// every time the toolchain moves.
+	writeFile(t, filepath.Join(dir, "go.mod"), "module example.test/generated\n\ngo "+repoGoVersion(t, root)+"\n\nrequire github.com/cervantesh/cervo-rules/v3 v3.0.0\n\nreplace github.com/cervantesh/cervo-rules/v3 => "+filepath.ToSlash(root)+"\n")
 	writeFile(t, filepath.Join(dir, "policyvocab", "vocab.go"), vocabGo)
 	writeFile(t, filepath.Join(dir, "policyrules", "generated_policy.go"), source)
 	writeFile(t, filepath.Join(dir, "policyrules", "generated_policy_test.go"), testSource)
@@ -688,6 +693,22 @@ func Vocabulary() core.Vocabulary {
 	)
 }
 `
+
+// repoGoVersion returns the go directive from this module's go.mod.
+func repoGoVersion(t *testing.T, root string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		t.Fatalf("read go.mod: %v", err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if version, ok := strings.CutPrefix(strings.TrimSpace(line), "go "); ok {
+			return strings.TrimSpace(version)
+		}
+	}
+	t.Fatal("go.mod has no go directive")
+	return ""
+}
 
 func repoRoot(t *testing.T) string {
 	t.Helper()

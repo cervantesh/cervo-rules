@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-go_version="${GO_VERSION:-1.25.8}"
+go_version="${GO_VERSION:-1.25.11}"
 tool_cache="${RUNNER_TOOL_CACHE:-/var/lib/ci-runner/work/tool_cache}"
 go_root="${tool_cache}/go/${go_version}/x64"
 go_bin="${go_root}/bin"
