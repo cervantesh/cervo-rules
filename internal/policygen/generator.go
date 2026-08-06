@@ -257,6 +257,12 @@ func validateGenerateOptions(options Options) error {
 	if strings.TrimSpace(options.VocabularyPackage) == "" {
 		return errors.New("missing vocabulary package")
 	}
+	// The vocabulary package alias is interpolated into the generated source as
+	// a qualifier, not as a quoted string, so it has to be a Go identifier for
+	// the same reason PackageName does.
+	if !packagePattern.MatchString(options.VocabularyPackage) {
+		return fmt.Errorf("invalid vocabulary package name %q", options.VocabularyPackage)
+	}
 	if strings.TrimSpace(options.VocabularyImport) == "" {
 		return errors.New("missing vocabulary import")
 	}

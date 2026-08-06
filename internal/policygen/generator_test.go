@@ -635,6 +635,8 @@ func TestGenerateRejectsBadOptions(t *testing.T) {
 		{name: "bad package", opts: Options{PackageName: "bad-name", VocabularyPackage: "policyvocab", VocabularyImport: "example.test/policyvocab", VocabularyReader: strings.NewReader(sampleVocab), PolicyReader: strings.NewReader(samplePolicy)}, want: "invalid package name"},
 		{name: "missing vocab package", opts: Options{PackageName: "policyrules", VocabularyImport: "example.test/policyvocab", VocabularyReader: strings.NewReader(sampleVocab), PolicyReader: strings.NewReader(samplePolicy)}, want: "missing vocabulary package"},
 		{name: "missing vocab import", opts: Options{PackageName: "policyrules", VocabularyPackage: "policyvocab", VocabularyReader: strings.NewReader(sampleVocab), PolicyReader: strings.NewReader(samplePolicy)}, want: "missing vocabulary import"},
+		// The alias is interpolated as a qualifier, not as a quoted string.
+		{name: "bad vocab package", opts: Options{PackageName: "policyrules", VocabularyPackage: "policyvocab.Vocabulary()\nfunc Injected() {}\nvar _ = policyvocab", VocabularyImport: "example.test/policyvocab", VocabularyReader: strings.NewReader(sampleVocab), PolicyReader: strings.NewReader(samplePolicy)}, want: "invalid vocabulary package name"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
