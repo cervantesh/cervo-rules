@@ -2,7 +2,7 @@
 
 All notable changes to CervoRules will be documented in this file.
 
-## v3.0.0-rc.5 - 2026-08-05
+## v3.0.0-rc.5 - 2026-08-06
 
 ### Added
 
