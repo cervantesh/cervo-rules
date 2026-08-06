@@ -170,6 +170,6 @@ Verification commands:
 
 ```bash
 scripts/release/check.sh v3.0.0-rc.5 dist-release-check-v3.0.0-rc.5
-scripts/release/verify-generic-package.sh v3.0.0-rc.5
+scripts/release/verify-github-release.sh v3.0.0-rc.5
 scripts/release/verify-oci-tools.sh v3.0.0-rc.5
 ```

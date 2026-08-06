@@ -43,7 +43,7 @@ v3 API.
 ## Publish packages
 
 ```powershell
-bash scripts/release/verify-generic-package.sh v3.0.0-rc.5
+bash scripts/release/verify-github-release.sh v3.0.0-rc.5
 bash scripts/release/verify-oci-tools.sh v3.0.0-rc.5
 ```
 

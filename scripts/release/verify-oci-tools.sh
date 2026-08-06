@@ -6,8 +6,10 @@ usage() {
 usage: scripts/release/verify-oci-tools.sh <version> [image]
 
 Pulls and verifies the CervoRules OCI image for a release or smoke version.
-Pass the image explicitly, or set CERVORULES_OCI_REGISTRY to build the default:
-  ${CERVORULES_OCI_REGISTRY}/cervosoft/cervorules-tools:<version>
+Pass the image explicitly, or let it default to GitHub Container Registry:
+  ghcr.io/<owner>/cervorules-tools:<version>
+
+The owner comes from GITHUB_REPOSITORY_OWNER, or from the git remote.
 
 Set CERVORULES_OCI_SKIP_PULL=1 when verifying a local image tag built in the
 current Docker daemon.
@@ -22,11 +24,19 @@ fi
 version="$1"
 image="${2:-}"
 if [[ -z "${image}" ]]; then
-  if [[ -z "${CERVORULES_OCI_REGISTRY:-}" ]]; then
-    echo "pass an image argument or set CERVORULES_OCI_REGISTRY; see --help" >&2
+  owner="${GITHUB_REPOSITORY_OWNER:-}"
+  if [[ -z "${owner}" ]]; then
+    origin="$(git remote get-url origin 2>/dev/null || true)"
+    origin="${origin%.git}"
+    origin="${origin#*github.com[:/]}"
+    owner="${origin%%/*}"
+  fi
+  if [[ -z "${owner}" ]]; then
+    echo "pass an image argument, or set GITHUB_REPOSITORY_OWNER; see --help" >&2
     exit 1
   fi
-  image="${CERVORULES_OCI_REGISTRY}/cervosoft/cervorules-tools:${version}"
+  owner="$(printf '%s' "${owner}" | tr '[:upper:]' '[:lower:]')"
+  image="ghcr.io/${owner}/cervorules-tools:${version}"
 fi
 
 case "${version}" in

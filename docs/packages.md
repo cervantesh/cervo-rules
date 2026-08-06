@@ -1,38 +1,27 @@
 # Packages
 
-This project publishes machine-consumable release artifacts to the package registry.
-Use releases for human release notes and source archives. Use Packages
-when automation needs pinned tools, schemas, checksums, or the optional tools
-container image.
+This project publishes machine-consumable release artifacts as GitHub Release
+assets, plus an optional tools image on GitHub Container Registry. The release
+page carries both the human notes and the artifacts automation pins.
 
-Package registry:
+Releases:
 
 ```text
-https://github.com/cervantesh/cervo-rules/packages
+https://github.com/cervantesh/cervo-rules/releases
 ```
 
 ## Package Catalog
 
-| Package | Type | Description |
+| Artifact | Where | Description |
 |---|---|---|
-| `cervo-rules` | Generic | Release artifacts for CervoRules: v3-native `cervorules-policygen` and `cervorules-vocabgen` binaries, policy/vocabulary JSON schemas, dependency/build metadata, artifact manifest, checksums, README, and changelog. |
-| `cervorules-tools` | OCI container | v3-native generator tools plus schemas for automation and release smoke checks. |
+| Release assets | GitHub Release for the tag | v3-native `cervorules-policygen` and `cervorules-vocabgen` binaries per platform, policy/vocabulary JSON schemas, dependency/build metadata, artifact manifest, checksums, README, and changelog. |
+| `cervorules-tools` | `ghcr.io/<owner>` | v3-native generator tools plus schemas for automation and release smoke checks. |
 
-The registry does not expose an API field for editing package descriptions
-directly. Keep canonical package descriptions here and in the project wiki, and
-keep each package linked to the `CervoSoft/cervo-rules` repository so the package
-page has useful repository context.
+## Release Assets
 
-## Generic Package
-
-The `Publish Packages` workflow publishes a generic package named
-`cervo-rules` under the `CervoSoft` owner for each release version.
-
-Generic package base URL:
-
-```text
-$PACKAGE_BASE_URL/<version>
-```
+The `Publish Packages` workflow attaches every artifact to the GitHub Release
+for the tag. Nothing needs a secret to be created: the workflow's `GITHUB_TOKEN`
+already carries `contents: write` and `packages: write`.
 
 Published files:
 
@@ -48,9 +37,8 @@ Download a pinned schema bundle:
 
 ```powershell
 $version = "v3.0.0-rc.5"
-$base = "$env:PACKAGE_BASE_URL/$version"
-curl.exe -fsSL "$base/cervorules-schemas-$version.tar.gz" -o "cervorules-schemas-$version.tar.gz"
-curl.exe -fsSL "$base/checksums.txt" -o checksums.txt
+gh release download $version --repo cervantesh/cervo-rules `
+  --pattern "cervorules-schemas-$version.tar.gz" --pattern "checksums.txt"
 ```
 
 Verify the checksum before extracting:
@@ -68,10 +56,10 @@ sha256sum -c checksums.txt --ignore-missing
 tar -xzf "cervorules-schemas-${version}.tar.gz"
 ```
 
-For a complete generic package proof, use the repository verification script:
+For a complete release assets proof, use the repository verification script:
 
 ```bash
-scripts/release/verify-generic-package.sh v0.1.0
+scripts/release/verify-github-release.sh v0.1.0
 ```
 
 The script downloads `checksums.txt`, `artifact-manifest.json`, build metadata,
@@ -82,11 +70,11 @@ For v2 packages, the release module path is
 `github.com/cervantesh/cervo-rules/v2`; for v3 packages, it is
 `github.com/cervantesh/cervo-rules/v3`.
 
-For v3 pre-releases after the physical split, the generic package is
+For v3 pre-releases after the physical split, the GitHub Release is
 runtime/schema-first:
 
 ```bash
-scripts/release/verify-generic-package.sh v3.0.0-rc.5
+scripts/release/verify-github-release.sh v3.0.0-rc.5
 ```
 
 The verifier expects `release_module=github.com/cervantesh/cervo-rules/v3`,
@@ -98,7 +86,7 @@ The verifier also checks v3-native tool archives when present and verifies
 
 | Check | Consumer command or file | Expected proof |
 | --- | --- | --- |
-| Generic package download | `scripts/release/verify-generic-package.sh v3.0.0-rc.5` | Downloads all generic files, verifies `checksums.txt`, and checks root plus v3 schemas. |
+| Release assets download | `scripts/release/verify-github-release.sh v3.0.0-rc.5` | Downloads all generic files, verifies `checksums.txt`, and checks root plus v3 schemas. |
 | v3 release module | `build-metadata.txt`, `artifact-manifest.json`, `sbom-modules.json`, `sbom-spdx.json`, `provenance.json` | Each artifact records `release_module=github.com/cervantesh/cervo-rules/v3` or `"release_module": "github.com/cervantesh/cervo-rules/v3"`. |
 | v3 dependency manifest | `release-dependencies.txt` | Captures `go list -m all` for the v3 root module. |
 | SBOM/provenance validation | `sbom-modules.json`, `sbom-spdx.json`, `provenance.json`, `artifact-manifest.json` | Verification confirms release version, v3 release module, commit presence, Go version, artifact names, SPDX marker, SLSA predicate type, source material, and builder provenance. |
@@ -109,10 +97,10 @@ The verifier also checks v3-native tool archives when present and verifies
 
 | Check | Consumer command or file | Expected proof |
 | --- | --- | --- |
-| Generic package download | `scripts/release/verify-generic-package.sh v2.1.0-rc.1` | Downloads all generic files, verifies `checksums.txt`, extracts a tool archive, and checks schemas. |
+| Release assets download | `scripts/release/verify-github-release.sh v2.1.0-rc.1` | Downloads all generic files, verifies `checksums.txt`, extracts a tool archive, and checks schemas. |
 | SBOM/provenance validation | `sbom-modules.json`, `sbom-spdx.json`, `provenance.json`, `artifact-manifest.json` | The verification script confirms release version, module path, commit presence, Go version, artifact names, SPDX document marker, SLSA predicate type, source material, and `scripts/release/build-artifacts.sh` builder provenance. |
 | Signed checksums RC decision | `checksums.txt.minisig` | Minisign signs `checksums.txt` when release signing is configured. Consumers enable strict verification with `CERVORULES_VERIFY_SIGNATURES=1` and `CERVORULES_MINISIGN_PUBLIC_KEY`. |
-| Clean consumer package verification | Run `scripts/release/verify-generic-package.sh v2.1.0-rc.1` outside the release `dist` directory. | Proves a consumer-style download, checksum verification, archive extraction, metadata inspection, and CLI `-version` checks. |
+| Clean consumer package verification | Run `scripts/release/verify-github-release.sh v2.1.0-rc.1` outside the release `dist` directory. | Proves a consumer-style download, checksum verification, archive extraction, metadata inspection, and CLI `-version` checks. |
 | OCI pull/run verification | `scripts/release/verify-oci-tools.sh v2.1.0-rc.1` | Pulls the image, verifies schema files, and runs `cervorules-policygen -version` plus `cervorules-vocabgen -version`. |
 
 Before consumers pin a v2 package version, confirm the release commit also
@@ -127,22 +115,18 @@ Those tests prove that packaged v2 tools can generate code for temp consumers
 and that gateway-style adoption uses the generated factory, HTTP classifier,
 runtime options, `DecisionResult`, and `CheckLimits` together.
 
-If the package is private, authenticate with a registry user and token that can
-read packages:
-
-```powershell
-curl.exe -fsSL -u "$($env:PACKAGE_REGISTRY_USER):$($env:PACKAGE_REGISTRY_TOKEN)" "$base/checksums.txt" -o checksums.txt
-```
+A private repository needs no extra configuration here: `gh` reuses the login
+from `gh auth login`, and CI uses the workflow's own `GITHUB_TOKEN`.
 
 Strict signed-checksum verification:
 
 ```powershell
 $env:CERVORULES_VERIFY_SIGNATURES = "1"
 $env:CERVORULES_MINISIGN_PUBLIC_KEY = "<public-key>"
-bash scripts/release/verify-generic-package.sh v2.1.0-rc.1
+bash scripts/release/verify-github-release.sh v2.1.0-rc.1
 ```
 
-The selected generic package signing tool is `minisign`. `GPG` is not used for
+The selected release assets signing tool is `minisign`. `GPG` is not used for
 automated package verification, and `cosign` is reserved for future OCI image
 signing/attestation work.
 
@@ -159,9 +143,8 @@ The extracted tool archive contains:
 Inspect release metadata:
 
 ```powershell
-curl.exe -fsSL "$base/build-metadata.txt" -o build-metadata.txt
-curl.exe -fsSL "$base/dependencies.txt" -o dependencies.txt
-curl.exe -fsSL "$base/artifact-manifest.json" -o artifact-manifest.json
+gh release download $version --repo cervantesh/cervo-rules `
+  --pattern "build-metadata.txt" --pattern "dependencies.txt" --pattern "artifact-manifest.json"
 Get-Content build-metadata.txt
 Get-Content dependencies.txt
 Get-Content artifact-manifest.json
@@ -186,16 +169,16 @@ lowercase owner because Docker registries reject uppercase repository paths.
 Default image name:
 
 ```text
-$CERVORULES_OCI_REGISTRY/cervosoft/cervorules-tools:<version>
+ghcr.io/cervantesh/cervorules-tools:<version>
 ```
 
 Pull and inspect a pinned image:
 
 ```powershell
-$version = "v0.1.0"
-docker pull "$env:CERVORULES_OCI_REGISTRY/cervosoft/cervorules-tools:$version"
-docker run --rm "$env:CERVORULES_OCI_REGISTRY/cervosoft/cervorules-tools:$version" -c "cervorules-policygen -version"
-docker run --rm "$env:CERVORULES_OCI_REGISTRY/cervosoft/cervorules-tools:$version" -c "cervorules-vocabgen -version"
+$version = "v3.0.0-rc.5"
+docker pull "ghcr.io/cervantesh/cervorules-tools:$version"
+docker run --rm "ghcr.io/cervantesh/cervorules-tools:$version" -c "cervorules-policygen -version"
+docker run --rm "ghcr.io/cervantesh/cervorules-tools:$version" -c "cervorules-vocabgen -version"
 ```
 
 Use `latest` only for local smoke checks. Consumers should pin release tags.
@@ -214,7 +197,7 @@ Safe smoke workflow:
 1. Trigger `Publish Packages` with `workflow_dispatch` and the smoke version.
 2. Confirm the workflow `Test` step passed.
 3. If OCI publishing is enabled, confirm the OCI registry preflight passed before artifact upload.
-4. Run `scripts/release/verify-generic-package.sh <smoke-version>` against the generic package.
+4. Run `scripts/release/verify-github-release.sh <smoke-version>` against the GitHub Release.
 5. Optionally repeat one manual authenticated download with a consumer-style read token.
 6. If OCI publishing is enabled, pull the matching image tag and run both version commands.
 7. Delete only the smoke package version and smoke OCI tag after verification.
@@ -241,10 +224,9 @@ Before deleting a package version:
 
 Recommended cleanup targets:
 
-- Generic package version:
-  `CervoSoft / cervo-rules / <smoke-version>`
+- Release: a prerelease tagged `<smoke-version>` on `cervantesh/cervo-rules`
 - OCI image tag:
-  `cervosoft/cervorules-tools:<smoke-version>`
+  `ghcr.io/cervantesh/cervorules-tools:<smoke-version>`
 
 Keep `latest` aligned with the latest real release. If a smoke OCI run moved
 `latest`, retag and push the latest real release image after deleting the smoke

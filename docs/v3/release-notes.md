@@ -97,7 +97,7 @@ Repository organization, package-script layout, and v3 root-boundary hardening.
 - Operational scripts are grouped by domain under `scripts/ci`,
   `scripts/release`, `scripts/performance`, and `scripts/sonar`.
 - v3 lives at the repository root after the physical v2/v3 split.
-- v2 maintenance moved to `CervoSoft/cervo-rules-v2` with final cut `v2.1.0`.
+- v2 maintenance moved to `cervantesh/cervo-rules-v2` with final cut `v2.1.0`.
 - Future breaking work will not carry v2 compatibility shims forward.
 
 ## Breaking Changes Since v2
@@ -115,7 +115,7 @@ Repository organization, package-script layout, and v3 root-boundary hardening.
 
 - v3 schema bundle under `schemas/v3`.
 - Public API inventory in `docs/v3/public-api-inventory.json`.
-- Legacy migration report command remains available from `CervoSoft/cervo-rules-v2`.
+- Legacy migration report command remains available from `cervantesh/cervo-rules-v2`.
 - Consumer conformance contract in `testkit`.
 - Package release marker: `release_module=github.com/cervantesh/cervo-rules/v3`.
 
@@ -138,6 +138,6 @@ powershell -ExecutionPolicy Bypass -File scripts/release/check.ps1 v3.0.0-rc.5 d
 ## Verification After Package Publish
 
 ```bash
-scripts/release/verify-generic-package.sh v3.0.0-rc.5
+scripts/release/verify-github-release.sh v3.0.0-rc.5
 scripts/release/verify-oci-tools.sh v3.0.0-rc.5
 ```

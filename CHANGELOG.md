@@ -57,6 +57,23 @@ All notable changes to CervoRules will be documented in this file.
   to the operation. It previously carried `reason`, which falls back to the
   literal `"route matched"` — a name that identifies nothing.
 
+### Changed (release tooling)
+
+- Publishing now targets GitHub. Release artifacts are attached to the GitHub
+  Release for the tag and the tools image goes to `ghcr.io/<owner>`. The
+  workflow previously uploaded to a generic package API that github.com does
+  not have, so the step returned 404 and could never succeed -- which is why
+  v3.0.0-rc.4 shipped a release with zero assets.
+- No secret has to be created for a release. `GITHUB_TOKEN` carries
+  `contents: write` and `packages: write`, and Actions injects it. The
+  `PACKAGE_TOKEN` secret and the `CERVORULES_OCI_REGISTRY` variable are gone.
+- Re-running the workflow for a version that already has a release replaces its
+  assets instead of failing, so a partial upload is repaired by re-running it.
+- Replaced `scripts/release/verify-generic-package.sh` with
+  `scripts/release/verify-github-release.sh`, which downloads the published
+  release with `gh` and runs the same checksum, module-marker, schema and CLI
+  version checks.
+
 ### Security
 
 - Fixed a code-injection path in the generator. A predicate description embeds

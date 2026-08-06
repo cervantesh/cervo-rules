@@ -3,37 +3,61 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-usage: scripts/release/verify-generic-package.sh <version> [work-dir]
+usage: scripts/release/verify-github-release.sh <version> [work-dir]
 
-Verifies the generic package for a CervoRules release or smoke version.
+Downloads a published GitHub Release and verifies it the way a consumer would:
+checksums, the release-module marker in every machine-readable artifact, the
+schema bundle, and the CLI -version of the tool archive for this platform.
+
+Replaces verify-generic-package.sh, which read a generic package API that
+github.com does not have, so it could never verify anything published here.
 
 Environment:
-  PACKAGE_BASE_URL  Required. Generic package base URL, for example
-                          https://<registry-host>/api/packages/<owner>/generic/cervo-rules
-  PACKAGE_REGISTRY_USER              Optional package read user.
-  PACKAGE_REGISTRY_TOKEN             Optional package read token.
+  GH_REPO                 Repository to read, as owner/name. Defaults to
+                          GITHUB_REPOSITORY, then to the git remote.
+  GH_TOKEN                Optional. Only needed for a private repository; gh
+                          uses its own login otherwise.
   CERVORULES_PACKAGE_OS   Tool archive OS. Defaults from uname.
   CERVORULES_PACKAGE_ARCH Tool archive architecture. Defaults from uname.
   CERVORULES_VERIFY_SIGNATURES
                           Set to 1 to require and verify checksums.txt.minisig.
   CERVORULES_MINISIGN_PUBLIC_KEY
-                          Minisign public key used when signature verification is enabled.
+                          Minisign public key, required when signature
+                          verification is enabled.
 EOF
 }
 
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || $# -lt 1 ]]; then
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || $# -lt 1 || $# -gt 2 ]]; then
   usage
   exit 2
 fi
 
 version="$1"
 work_dir="${2:-$(mktemp -d)}"
-if [[ -z "${PACKAGE_BASE_URL:-}" ]]; then
-  echo "PACKAGE_BASE_URL is required; see --help" >&2
+
+case "${version}" in
+  v*) ;;
+  *)
+    echo "version must start with v, got ${version}" >&2
+    exit 1
+    ;;
+esac
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "gh is required to download a GitHub Release" >&2
   exit 1
 fi
-base_url="${PACKAGE_BASE_URL}"
-package_url="${base_url%/}/${version}"
+
+repo="${GH_REPO:-${GITHUB_REPOSITORY:-}}"
+if [[ -z "${repo}" ]]; then
+  origin="$(git remote get-url origin 2>/dev/null || true)"
+  origin="${origin%.git}"
+  repo="${origin#*github.com[:/]}"
+fi
+if [[ -z "${repo}" ]]; then
+  echo "cannot determine the repository; set GH_REPO to owner/name" >&2
+  exit 1
+fi
 
 expected_module="github.com/cervantesh/cervo-rules"
 case "${version}" in
@@ -63,26 +87,22 @@ package_arch="${CERVORULES_PACKAGE_ARCH:-$(detect_arch)}"
 tool_archive="cervorules-tools-${version}-${package_os}-${package_arch}.tar.gz"
 schema_archive="cervorules-schemas-${version}.tar.gz"
 
-case "${version}" in
-  v*) ;;
-  *)
-    echo "version must start with v, got ${version}" >&2
-    exit 1
-    ;;
-esac
-
-mkdir -p "${work_dir}"
-
-curl_args=(--fail --show-error --silent --location)
-if [[ -n "${PACKAGE_REGISTRY_USER:-}" || -n "${PACKAGE_REGISTRY_TOKEN:-}" ]]; then
-  if [[ -z "${PACKAGE_REGISTRY_USER:-}" || -z "${PACKAGE_REGISTRY_TOKEN:-}" ]]; then
-    echo "PACKAGE_REGISTRY_USER and PACKAGE_REGISTRY_TOKEN must be set together" >&2
+if [[ "${CERVORULES_VERIFY_SIGNATURES:-0}" == "1" ]]; then
+  if [[ -z "${CERVORULES_MINISIGN_PUBLIC_KEY:-}" ]]; then
+    echo "CERVORULES_MINISIGN_PUBLIC_KEY is required when CERVORULES_VERIFY_SIGNATURES=1" >&2
     exit 1
   fi
-  curl_args+=(--user "${PACKAGE_REGISTRY_USER}:${PACKAGE_REGISTRY_TOKEN}")
+  if ! command -v minisign >/dev/null 2>&1; then
+    echo "minisign is required when CERVORULES_VERIFY_SIGNATURES=1" >&2
+    exit 1
+  fi
 fi
 
-files=(
+mkdir -p "${work_dir}"
+echo "Downloading release ${version} from ${repo}"
+gh release download "${version}" --repo "${repo}" --dir "${work_dir}" --clobber
+
+required=(
   "checksums.txt"
   "artifact-manifest.json"
   "build-metadata.txt"
@@ -93,31 +113,18 @@ files=(
   "provenance.json"
   "${schema_archive}"
 )
-
-if [[ "${CERVORULES_VERIFY_SIGNATURES:-0}" == "1" ]]; then
-  if [[ -z "${CERVORULES_MINISIGN_PUBLIC_KEY:-}" ]]; then
-    echo "CERVORULES_MINISIGN_PUBLIC_KEY is required when CERVORULES_VERIFY_SIGNATURES=1" >&2
+for file in "${required[@]}"; do
+  if [[ ! -s "${work_dir}/${file}" ]]; then
+    echo "release ${version} is missing ${file}" >&2
     exit 1
   fi
-  if ! command -v minisign >/dev/null 2>&1; then
-    echo "minisign is required when CERVORULES_VERIFY_SIGNATURES=1" >&2
-    exit 1
-  fi
-  files+=("checksums.txt.minisig")
-fi
-
-for file in "${files[@]}"; do
-  curl "${curl_args[@]}" "${package_url}/${file}" --output "${work_dir}/${file}"
 done
-if curl "${curl_args[@]}" "${package_url}/${tool_archive}" --output "${work_dir}/${tool_archive}"; then
-  has_tool_archive=1
-else
-  has_tool_archive=0
-  rm -f "${work_dir}/${tool_archive}"
-  echo "tool archive not present; verifying metadata and schema package"
-fi
 
 if [[ "${CERVORULES_VERIFY_SIGNATURES:-0}" == "1" ]]; then
+  if [[ ! -s "${work_dir}/checksums.txt.minisig" ]]; then
+    echo "release ${version} has no checksums.txt.minisig" >&2
+    exit 1
+  fi
   minisign -V -m "${work_dir}/checksums.txt" -x "${work_dir}/checksums.txt.minisig" -P "${CERVORULES_MINISIGN_PUBLIC_KEY}"
 fi
 
@@ -125,6 +132,13 @@ fi
   cd "${work_dir}"
   sha256sum -c checksums.txt --ignore-missing
 )
+
+has_tool_archive=0
+if [[ -s "${work_dir}/${tool_archive}" ]]; then
+  has_tool_archive=1
+else
+  echo "no tool archive for ${package_os}/${package_arch}; verifying metadata and schema bundle"
+fi
 
 extract_dir="${work_dir}/extract"
 rm -rf "${extract_dir}"
@@ -141,17 +155,14 @@ if [[ "${has_tool_archive}" == "1" ]]; then
     exe_suffix=".exe"
   fi
 
-  policy_version="$("${tool_dir}/cervorules-policygen${exe_suffix}" -version)"
-  vocab_version="$("${tool_dir}/cervorules-vocabgen${exe_suffix}" -version)"
+  policy_version="$("${tool_dir}/cervorules-policygen${exe_suffix}" -version 2>&1)"
+  vocab_version="$("${tool_dir}/cervorules-vocabgen${exe_suffix}" -version 2>&1)"
 
-  expected_policy="cervorules-policygen ${version}"
-  expected_vocab="cervorules-vocabgen ${version}"
-
-  if [[ "${policy_version}" != "${expected_policy}" ]]; then
+  if [[ "${policy_version}" != "cervorules-policygen ${version}" ]]; then
     echo "unexpected policygen version: ${policy_version}" >&2
     exit 1
   fi
-  if [[ "${vocab_version}" != "${expected_vocab}" ]]; then
+  if [[ "${vocab_version}" != "cervorules-vocabgen ${version}" ]]; then
     echo "unexpected vocabgen version: ${vocab_version}" >&2
     exit 1
   fi
@@ -166,13 +177,14 @@ if [[ "${has_tool_archive}" == "1" ]]; then
   test -s "${tool_dir}/dependencies.txt"
   test -s "${tool_dir}/release-dependencies.txt"
 fi
+
 test -s "${schema_dir}/policy-rules.schema.json"
 test -s "${schema_dir}/policy-vocabulary.schema.json"
 if [[ "${version}" == v3.* ]]; then
   test -s "${schema_dir}/v3/policy-rules.schema.json"
   test -s "${schema_dir}/v3/policy-vocabulary.schema.json"
 fi
-test -s "${work_dir}/artifact-manifest.json"
+
 grep -qx "version=${version}" "${work_dir}/build-metadata.txt"
 grep -qx "release_module=${expected_module}" "${work_dir}/build-metadata.txt"
 grep -qx "${expected_module}" "${work_dir}/release-dependencies.txt"
@@ -184,7 +196,6 @@ fi
 grep -q "\"name\": \"${schema_archive}\"" "${work_dir}/artifact-manifest.json"
 grep -q "\"version\": \"${version}\"" "${work_dir}/sbom-modules.json"
 grep -q "\"release_module\": \"${expected_module}\"" "${work_dir}/sbom-modules.json"
-grep -q "${expected_module}" "${work_dir}/release-dependencies.txt"
 grep -q '"SPDXID": "SPDXRef-DOCUMENT"' "${work_dir}/sbom-spdx.json"
 grep -q "\"version\": \"${version}\"" "${work_dir}/sbom-spdx.json"
 grep -q "\"release_module\": \"${expected_module}\"" "${work_dir}/sbom-spdx.json"
@@ -197,14 +208,9 @@ grep -q "\"predicateType\": \"https://slsa.dev/provenance/v1\"" "${work_dir}/pro
 grep -q '"materials":' "${work_dir}/provenance.json"
 
 cat <<EOF
-Verified generic package ${version}
-work_dir=${work_dir}
-tool_archive_present=${has_tool_archive}
-module=${expected_module}
-artifact_manifest=artifact-manifest.json
-sbom=sbom-modules.json
-sbom_spdx=sbom-spdx.json
-provenance=provenance.json
-policygen=${policy_version}
-vocabgen=${vocab_version}
+Verified GitHub Release ${version}
+  repository: ${repo}
+  module:     ${expected_module}
+  work dir:   ${work_dir}
+  tool archive verified: $([[ "${has_tool_archive}" == "1" ]] && echo "yes (${package_os}/${package_arch})" || echo "no")
 EOF

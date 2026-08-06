@@ -1,7 +1,7 @@
 # Policy Diff Design
 
 Status: historical v2 design plus future v3 target. The physical split moved
-the implemented v2 diff/compat tooling to `CervoSoft/cervo-rules-v2`. Native v3
+the implemented v2 diff/compat tooling to `cervantesh/cervo-rules-v2`. Native v3
 currently supports `check` and `generate`; v3 diff/compat/inspect commands need
 new design before they are claimed in active workflows.
 

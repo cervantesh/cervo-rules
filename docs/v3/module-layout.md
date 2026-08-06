@@ -11,7 +11,7 @@ github.com/cervantesh/cervo-rules/v3
 ```
 
 The active repository now keeps v3 at the repository root. v2 maintenance moved
-to `CervoSoft/cervo-rules-v2` as part of the physical split.
+to `cervantesh/cervo-rules-v2` as part of the physical split.
 
 The v3 root package is marker-only. It exposes module identity, not runtime
 helpers or compatibility aliases. Consumers should import concrete subpackages
@@ -47,7 +47,7 @@ Do not mix v2 and v3 packages inside the same generated policy package.
 v3 release artifacts should use the existing package channels with v3-specific
 metadata:
 
-- generic package: schemas, checksums, build metadata, module manifest, and
+- release assets: schemas, checksums, build metadata, module manifest, and
   v3-native `cervorules-policygen` / `cervorules-vocabgen` binaries;
 - OCI image: v3-native tools plus schemas tagged with the v3 version;
 - release notes: identify v3 as breaking and link the migration guide.

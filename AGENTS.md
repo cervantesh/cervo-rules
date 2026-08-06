@@ -85,7 +85,7 @@ Use `cervorules-vocabgen` for v3 vocabulary constants.
 
 Use `cervorules-policygen check` before changing generated code.
 Use `cervorules-policygen generate` to produce v3 generated policy code and tests.
-Use v2 maintenance tooling from `CervoSoft/cervo-rules-v2` only for legacy
+Use v2 maintenance tooling from `cervantesh/cervo-rules-v2` only for legacy
 `migrate-v3`, `compat`, `diff`, or `inspect-api` workflows until those commands
 are intentionally redesigned for v3.
 

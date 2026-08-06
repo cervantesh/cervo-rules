@@ -122,5 +122,5 @@ v3 machine-readable schemas live under `schemas/v3`:
 - `agent-manifest.schema.json`;
 - `generated-policy-metadata.schema.json`.
 
-Release artifacts must include these schemas in the generic package and OCI
+Release artifacts must include these schemas in the GitHub Release and OCI
 tools image.

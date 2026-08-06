@@ -1,5 +1,15 @@
 name: Publish Packages
 
+# Publishes to GitHub: release artifacts as GitHub Release assets, and the
+# tools image to GitHub Container Registry.
+#
+# It previously uploaded to a generic package API that github.com does not
+# have, so the step returned 404 and could never succeed -- which is why
+# v3.0.0-rc.4 shipped a release with zero assets.
+#
+# Nothing here needs a secret to be created. GITHUB_TOKEN is injected by
+# Actions and the permissions block below grants it what it needs.
+
 on:
   push:
     tags:
@@ -11,12 +21,10 @@ on:
         required: true
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 env:
-  PACKAGE_OWNER: CervoSoft
-  GENERIC_PACKAGE: cervo-rules
   OCI_IMAGE: cervorules-tools
 
 jobs:
@@ -25,6 +33,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Resolve version
         id: version
@@ -36,36 +46,23 @@ jobs:
           else
             version="${GITHUB_REF_NAME}"
           fi
+          case "${version}" in
+            v*) ;;
+            *) echo "release version must start with v: ${version}" >&2; exit 1 ;;
+          esac
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
           echo "source_date_epoch=$(git log -1 --format=%ct)" >> "${GITHUB_OUTPUT}"
+          if [[ "${version}" == *-* ]]; then
+            echo "prerelease=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "prerelease=false" >> "${GITHUB_OUTPUT}"
+          fi
 
       - name: Setup Go
         run: bash scripts/ci/setup-go-ci.sh
 
       - name: Test
         run: go test -count=1 ./...
-
-      - name: Preflight OCI registry
-        if: vars.CERVORULES_PUBLISH_OCI == 'true'
-        shell: bash
-        env:
-          PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
-          REGISTRY_ACTOR: ${{ github.actor }}
-          SERVER_URL: ${{ github.server_url }}
-          OCI_REGISTRY: ${{ vars.CERVORULES_OCI_REGISTRY }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${PACKAGE_TOKEN:-}" ]]; then
-            echo "Missing PACKAGE_TOKEN secret for OCI publishing" >&2
-            exit 1
-          fi
-          registry="${OCI_REGISTRY:-}"
-          if [[ -z "${registry}" ]]; then
-            registry="${SERVER_URL#https://}"
-            registry="${registry#http://}"
-          fi
-          echo "Checking Docker registry reachability for ${registry}"
-          timeout 30 sh -c 'printf "%s" "$1" | docker login "$2" --username "$3" --password-stdin' sh "${PACKAGE_TOKEN}" "${registry}" "${REGISTRY_ACTOR}"
 
       - name: Build release artifacts
         shell: bash
@@ -74,6 +71,10 @@ jobs:
           CERVORULES_MINISIGN_SECRET_KEY: ${{ secrets.CERVORULES_MINISIGN_SECRET_KEY }}
         run: |
           set -euo pipefail
+          # Signing is optional. When no key is configured the release ships
+          # checksums.txt without checksums.txt.minisig, and
+          # verify-github-release.sh only demands a signature when the consumer
+          # asks for one.
           if [[ -n "${CERVORULES_MINISIGN_SECRET_KEY:-}" ]]; then
             printf '%s' "${CERVORULES_MINISIGN_SECRET_KEY}" > minisign-release.key
             chmod 600 minisign-release.key
@@ -82,50 +83,57 @@ jobs:
           fi
           bash scripts/release/build-artifacts.sh "${{ steps.version.outputs.version }}" dist
 
-      - name: Publish generic packages
+      # The release is created if it does not exist and updated if it does, so
+      # re-running the workflow for a version repairs a partial upload instead
+      # of failing on it.
+      - name: Publish release assets
         shell: bash
         env:
-          PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
-          REGISTRY_ACTOR: ${{ github.actor }}
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
-          SERVER_URL: ${{ github.server_url }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
         run: |
           set -euo pipefail
-          if [[ -z "${PACKAGE_TOKEN:-}" ]]; then
-            echo "Missing PACKAGE_TOKEN secret for package publishing" >&2
-            exit 1
+          notes_flag=(--generate-notes)
+          if [[ -f docs/v3/release-notes.md ]]; then
+            notes_flag=(--notes-file docs/v3/release-notes.md)
           fi
-          api="${SERVER_URL%/}/api/packages/${PACKAGE_OWNER}/generic/${GENERIC_PACKAGE}/${VERSION}"
-          for file in dist/*; do
-            if [[ -f "${file}" ]]; then
-              name="$(basename "${file}")"
-              curl --fail --show-error --silent \
-                --user "${REGISTRY_ACTOR}:${PACKAGE_TOKEN}" \
-                --upload-file "${file}" \
-                "${api}/${name}"
-            fi
-          done
+          prerelease_flag=()
+          if [[ "${PRERELEASE}" == "true" ]]; then
+            prerelease_flag=(--prerelease)
+          fi
+          if gh release view "${VERSION}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release ${VERSION} exists; replacing its assets"
+            gh release upload "${VERSION}" dist/* --repo "${GITHUB_REPOSITORY}" --clobber
+          else
+            gh release create "${VERSION}" dist/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "CervoRules ${VERSION}" \
+              "${notes_flag[@]}" \
+              "${prerelease_flag[@]}"
+          fi
+
+      - name: Verify published assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: bash scripts/release/verify-github-release.sh "${VERSION}"
 
       - name: Publish OCI tools image
         if: vars.CERVORULES_PUBLISH_OCI == 'true'
         shell: bash
         env:
-          PACKAGE_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
-          REGISTRY_ACTOR: ${{ github.actor }}
           VERSION: ${{ steps.version.outputs.version }}
-          SERVER_URL: ${{ github.server_url }}
-          OCI_REGISTRY: ${{ vars.CERVORULES_OCI_REGISTRY }}
+          REGISTRY_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          registry="${OCI_REGISTRY:-}"
-          if [[ -z "${registry}" ]]; then
-            registry="${SERVER_URL#https://}"
-            registry="${registry#http://}"
-          fi
-          oci_owner="$(printf '%s' "${PACKAGE_OWNER}" | tr '[:upper:]' '[:lower:]')"
-          image="${registry}/${oci_owner}/${OCI_IMAGE}:${VERSION}"
-          latest="${registry}/${oci_owner}/${OCI_IMAGE}:latest"
-          echo "${PACKAGE_TOKEN}" | docker login "${registry}" --username "${REGISTRY_ACTOR}" --password-stdin
+          registry="ghcr.io"
+          owner="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          image="${registry}/${owner}/${OCI_IMAGE}:${VERSION}"
+          latest="${registry}/${owner}/${OCI_IMAGE}:latest"
+          printf '%s' "${GITHUB_TOKEN}" | docker login "${registry}" --username "${REGISTRY_ACTOR}" --password-stdin
           docker build -f build/tools/Dockerfile --build-arg "VERSION=${VERSION}" -t "${image}" -t "${latest}" .
           docker push "${image}"
           docker push "${latest}"

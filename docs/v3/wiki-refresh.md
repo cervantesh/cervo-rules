@@ -23,7 +23,7 @@ the repo-side source of truth for the next wiki update.
 The wiki refresh should mention:
 
 - `v3.0.0-rc.2` as the clean post-fix v3 release candidate;
-- `scripts/release/verify-generic-package.sh v3.0.0-rc.2` and `scripts/release/verify-oci-tools.sh v3.0.0-rc.2` as release evidence;
+- `scripts/release/verify-github-release.sh v3.0.0-rc.2` and `scripts/release/verify-oci-tools.sh v3.0.0-rc.2` as release evidence;
 - `scripts/performance/report.sh` as performance evidence;
 - `github.com/cervantesh/cervo-rules/v3` as the v3 module path;
 - `Operation`, `Target`, and `Executor` as v3 public primitive names;

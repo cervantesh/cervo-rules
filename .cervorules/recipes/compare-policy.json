@@ -21,6 +21,6 @@
   "failure_mode": "Fail the task when validation fails or the manual diff shows an unaccepted behavioral change.",
   "notes": [
     "Attach validation JSON and the policy diff to the issue or PR.",
-    "Use CervoSoft/cervo-rules-v2 only for historical v2 migration/diff tooling."
+    "Use cervantesh/cervo-rules-v2 only for historical v2 migration/diff tooling."
   ]
 }

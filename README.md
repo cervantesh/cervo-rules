@@ -204,14 +204,14 @@ Use the v3 tooling for:
 - generated tests beside the generated factory.
 
 Legacy v2 migration tooling remains in
-[CervoSoft/cervo-rules-v2](https://github.com/cervantesh/cervo-rules-v2).
+[cervantesh/cervo-rules-v2](https://github.com/cervantesh/cervo-rules-v2).
 
 ## Release And Packages
 
 `v3.0.0-rc.3` is the clean post-fix v3 RC. It verified:
 
 - package publishing workflow;
-- generic package artifacts;
+- release assets;
 - OCI tools image;
 - checksums;
 - schemas;

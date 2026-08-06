@@ -39,10 +39,10 @@ rm -rf "${dist_dir}"
 scripts/release/build-artifacts.sh "${version}" "${dist_dir}"
 
 if [[ "${CERVORULES_VERIFY_PACKAGE:-0}" == "1" ]]; then
-  echo "==> verify published generic package"
-  scripts/release/verify-generic-package.sh "${version}" "${dist_dir}-package"
+  echo "==> verify published GitHub Release"
+  scripts/release/verify-github-release.sh "${version}" "${dist_dir}-package"
 else
-  echo "==> package verification skipped; set CERVORULES_VERIFY_PACKAGE=1 after publishing"
+  echo "==> release verification skipped; set CERVORULES_VERIFY_PACKAGE=1 after publishing"
 fi
 
 echo "release check completed for ${version}"

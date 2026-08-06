@@ -9,12 +9,12 @@ Use this document for release execution.
 ## Release Checklist
 
 Complete this checklist before publishing a release tag. v2 maintenance now
-lives in `CervoSoft/cervo-rules-v2`; the active repository is v3-root.
+lives in `cervantesh/cervo-rules-v2`; the active repository is v3-root.
 
 ### Before Tagging
 
 - Confirm the public Go API intended for the target release is documented in `README.md`.
-- For v2 maintenance releases, use the `CervoSoft/cervo-rules-v2` repository.
+- For v2 maintenance releases, use the `cervantesh/cervo-rules-v2` repository.
 - Confirm `schemas/policy-vocabulary.schema.json` and `schemas/policy-rules.schema.json` describe the supported v1 DSL fields.
 - Confirm `examples/README.md` identifies the default copy example and current command workflow.
 - Confirm `docs/change-management/physical-repo-split.md` still matches the repository layout.
@@ -69,15 +69,15 @@ lives in `CervoSoft/cervo-rules-v2`; the active repository is v3-root.
 - Push the tag to origin.
 - Confirm the `Publish Packages` workflow starts for the pushed tag.
 - Confirm the workflow `Test` step completed `go test -count=1 ./...`.
-- If `CERVORULES_PUBLISH_OCI=true`, confirm the OCI preflight step can log in to the registry before generic package upload.
-- Confirm the workflow uploaded all generic package files listed below.
+- If `CERVORULES_PUBLISH_OCI=true`, confirm the OCI preflight step can log in to the registry before release assets upload.
+- Confirm the workflow uploaded all release assets files listed below.
 - Confirm the `Dependency Audit` workflow is passing on the release commit.
 - If `CERVORULES_PUBLISH_OCI=true`, confirm the OCI publish step pushed both `<version>` and `latest`.
 - Create or update the release notes from `CHANGELOG.md` after package verification passes.
 
 ### Package Verification
 
-- Download `checksums.txt` from the generic package version.
+- Download `checksums.txt` from the GitHub Release version.
 - Download `artifact-manifest.json` and confirm it records the release version,
   commit, module path, Go version, artifact names, SHA-256 digests, and byte
   sizes.
@@ -88,19 +88,19 @@ lives in `CervoSoft/cervo-rules-v2`; the active repository is v3-root.
 - If the release contains platform tool archives, download at least one archive,
   verify its checksum, extract it, and run CLI `-version` checks.
 - Download `cervorules-schemas-<version>.tar.gz` and confirm both schema files are present.
-- Run `scripts/release/verify-generic-package.sh <version>` from a clean checkout or release operator shell.
+- Run `scripts/release/verify-github-release.sh <version>` from a clean checkout or release operator shell.
 - If the package is private, repeat one download using a consumer-style read token.
 
 ### OCI Verification
 
-- Pull `$CERVORULES_OCI_REGISTRY/cervosoft/cervorules-tools:<version>`.
+- Pull `ghcr.io/cervantesh/cervorules-tools:<version>`.
 - Confirm `/opt/cervorules/schemas/policy-vocabulary.schema.json` exists.
-- Pull `$CERVORULES_OCI_REGISTRY/cervosoft/cervorules-tools:latest` and confirm it resolves to the same real release after the final release is published.
+- Pull `ghcr.io/cervantesh/cervorules-tools:latest` and confirm it resolves to the same real release after the final release is published.
 
 ### Rollback Notes
 
 - If tests fail before upload, leave the tag in place only if no package artifacts were published; otherwise treat it as a partial release.
-- If generic packages were published with bad artifacts, publish a corrected patch version instead of overwriting the release version.
+- If release assets were published with bad artifacts, publish a corrected patch version instead of overwriting the release version.
 - If the OCI `latest` tag points to a bad image, retag the latest known-good release image as `latest` and push it.
 - If a tag was created from the wrong commit before packages published, delete the local and remote tag, recreate it from `main`, and push it again.
 - Record any partial release or rollback action in the release notes and `CHANGELOG.md`.
@@ -131,10 +131,10 @@ live in [docs/packages.md](packages.md).
 | Check | Evidence command or artifact | RC decision |
 | --- | --- | --- |
 | Local release artifact build | `scripts/release/check.sh v3.0.0-rc.3 dist-release-check-v3.0.0-rc.3` | Required before tagging; proves v3 root plus v3 release metadata can be built from a clean dist directory. |
-| Generic package download | `scripts/release/verify-generic-package.sh v3.0.0-rc.3` | Required after package publication; confirms `release_module=github.com/cervantesh/cervo-rules/v3`. |
+| Release assets download | `scripts/release/verify-github-release.sh v3.0.0-rc.3` | Required after package publication; confirms `release_module=github.com/cervantesh/cervo-rules/v3`. |
 | v3 schemas | `schemas/v3/*.schema.json` in generic archives and OCI image | Required; release consumers must receive v3 policy, vocabulary, observation, inspection, compatibility, manifest, and metadata schemas. |
 | v3 dependency manifest | `release-dependencies.txt` | Required; generated with `go list -m all` for the v3 root module. |
-| SBOM/provenance validation | `sbom-modules.json`, `sbom-spdx.json`, `provenance.json`, and `artifact-manifest.json` are checked by `scripts/release/verify-generic-package.sh v3.0.0-rc.3`. | Required; each machine-readable artifact must contain `"release_module": "github.com/cervantesh/cervo-rules/v3"`. |
+| SBOM/provenance validation | `sbom-modules.json`, `sbom-spdx.json`, `provenance.json`, and `artifact-manifest.json` are checked by `scripts/release/verify-github-release.sh v3.0.0-rc.3`. | Required; each machine-readable artifact must contain `"release_module": "github.com/cervantesh/cervo-rules/v3"`. |
 | Signed checksums | `checksums.txt.minisig` | Published when minisign release signing is configured; strict consumers verify with `CERVORULES_VERIFY_SIGNATURES=1`. |
 | OCI pull/run verification | `scripts/release/verify-oci-tools.sh v3.0.0-rc.3` | Required when OCI publishing is enabled; verifies both CLI `-version` commands plus root and v3 schemas in `/opt/cervorules/schemas`. |
 
@@ -143,15 +143,14 @@ live in [docs/packages.md](packages.md).
 | Check | Evidence command or artifact | RC decision |
 | --- | --- | --- |
 | Local release artifact build | `scripts/release/check.sh v2.1.0-rc.1` | Required before tagging; do not publish from a failing tree. |
-| Generic package download | `scripts/release/verify-generic-package.sh v2.1.0-rc.1` | Required after the package workflow publishes. |
-| SBOM/provenance validation | `sbom-modules.json`, `sbom-spdx.json`, `provenance.json`, and `artifact-manifest.json` are downloaded and checked by `scripts/release/verify-generic-package.sh v2.1.0-rc.1`. | Required; provenance must name `scripts/release/build-artifacts.sh`, commit, module, Go version, release version, SLSA predicate type, and source material. SPDX SBOM must contain `SPDXRef-DOCUMENT`. |
-| Signed checksums RC decision | `checksums.txt.minisig` signs `checksums.txt` with minisign when `CERVORULES_MINISIGN_SECRET_KEY_FILE` is configured. | Minisign is selected for generic package checksum signatures. GPG is not selected for automated package verification; cosign is deferred to OCI image signing. |
-| Clean consumer package verification | Run from a clean checkout or release operator shell: `scripts/release/verify-generic-package.sh v2.1.0-rc.1`. | Required to prove download, checksum, extract, schema, metadata, and CLI `-version` checks without relying on the release build directory. |
+| Release assets download | `scripts/release/verify-github-release.sh v2.1.0-rc.1` | Required after the package workflow publishes. |
+| SBOM/provenance validation | `sbom-modules.json`, `sbom-spdx.json`, `provenance.json`, and `artifact-manifest.json` are downloaded and checked by `scripts/release/verify-github-release.sh v2.1.0-rc.1`. | Required; provenance must name `scripts/release/build-artifacts.sh`, commit, module, Go version, release version, SLSA predicate type, and source material. SPDX SBOM must contain `SPDXRef-DOCUMENT`. |
+| Signed checksums RC decision | `checksums.txt.minisig` signs `checksums.txt` with minisign when `CERVORULES_MINISIGN_SECRET_KEY_FILE` is configured. | Minisign is selected for release assets checksum signatures. GPG is not selected for automated package verification; cosign is deferred to OCI image signing. |
+| Clean consumer package verification | Run from a clean checkout or release operator shell: `scripts/release/verify-github-release.sh v2.1.0-rc.1`. | Required to prove download, checksum, extract, schema, metadata, and CLI `-version` checks without relying on the release build directory. |
 | OCI pull/run verification | `scripts/release/verify-oci-tools.sh v2.1.0-rc.1` | Required when OCI publishing is enabled; it pulls the image and runs `cervorules-policygen -version` and `cervorules-vocabgen -version`. |
 
-The `Publish Packages` workflow runs for tags matching `v*` and publishes a
-generic package named `cervo-rules` under the `CervoSoft` owner. The package
-contains:
+The `Publish Packages` workflow runs for tags matching `v*` and attaches these
+artifacts to the GitHub Release for the tag:
 
 - `cervorules-tools-<version>-linux-amd64.tar.gz`;
 - `cervorules-tools-<version>-linux-arm64.tar.gz`;
@@ -166,22 +165,27 @@ contains:
 - `checksums.txt`;
 - `checksums.txt.minisig` when minisign signing is configured;
 
-The workflow requires a repository secret named `PACKAGE_TOKEN` with package
-write permissions. If the container registry is enabled, set repository variable
-`CERVORULES_PUBLISH_OCI=true` to also publish the `cervorules-tools` OCI image
-from `build/tools/Dockerfile`. If the Actions-internal `github.server_url` is not
-resolvable by Docker, set `CERVORULES_OCI_REGISTRY` to the public registry host,
-for example `registry.example.com`. OCI image repository paths are pushed
-with a lowercase owner because Docker rejects uppercase repository names.
+The workflow needs no secret to be created. Its `GITHUB_TOKEN` carries
+`contents: write` for the release and `packages: write` for the image, and
+Actions injects it automatically.
 
-For signed generic packages, configure a minisign secret key file for the release
-operator or runner and pass it as `CERVORULES_MINISIGN_SECRET_KEY_FILE`.
+Set repository variable `CERVORULES_PUBLISH_OCI=true` to also publish the
+`cervorules-tools` image from `build/tools/Dockerfile` to
+`ghcr.io/<owner>/cervorules-tools`. The owner is lowercased because Docker
+registries reject uppercase repository paths.
+
+Re-running the workflow for a version that already has a release replaces its
+assets rather than failing, so a partial upload is repaired by re-running it.
+
+Signing stays optional. To sign `checksums.txt`, configure the repository secret
+`CERVORULES_MINISIGN_SECRET_KEY`; without it the release ships unsigned and
+consumers who pass `CERVORULES_VERIFY_SIGNATURES=1` get a clear failure.
 Consumers verify signatures with:
 
 ```bash
 CERVORULES_VERIFY_SIGNATURES=1 \
 CERVORULES_MINISIGN_PUBLIC_KEY=<public-key> \
-scripts/release/verify-generic-package.sh v2.1.0-rc.1
+scripts/release/verify-github-release.sh v2.1.0-rc.1
 ```
 
 Local artifact smoke test:
@@ -191,10 +195,10 @@ bash scripts/release/build-artifacts.sh v0.0.0-local dist
 Get-ChildItem dist
 ```
 
-Published generic package smoke test:
+Published release assets smoke test:
 
 ```bash
-scripts/release/verify-generic-package.sh v0.0.0-smoke-YYYYMMDD-HHMM
+scripts/release/verify-github-release.sh v0.0.0-smoke-YYYYMMDD-HHMM
 ```
 
 Full release operator check:

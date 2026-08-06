@@ -5,7 +5,7 @@ Status: deferred for native v3.
 The physical split moved v2 maintenance and historical migration tooling to:
 
 ```text
-CervoSoft/cervo-rules-v2
+cervantesh/cervo-rules-v2
 ```
 
 Native v3 currently ships `cervorules-vocabgen` and `cervorules-policygen`

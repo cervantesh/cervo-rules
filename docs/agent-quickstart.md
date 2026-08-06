@@ -14,9 +14,9 @@ The active repository is v3-root and ships v3-native generator commands.
 | Create vocabulary | `cervorules-vocabgen` and `policy-vocabulary.yaml` |
 | Generate policy | `cervorules-policygen generate` |
 | Validate policy | `cervorules-policygen check` |
-| Legacy migration/diff | `CervoSoft/cervo-rules-v2` tooling; native v3 compat tooling is future work |
+| Legacy migration/diff | `cervantesh/cervo-rules-v2` tooling; native v3 compat tooling is future work |
 | Run conformance | `testkit.MustAssertConsumerConformance` |
-| Consume packages | `scripts/release/verify-generic-package.sh` and `scripts/release/verify-oci-tools.sh` |
+| Consume packages | `scripts/release/verify-github-release.sh` and `scripts/release/verify-oci-tools.sh` |
 | Pick package import | `docs/package-minimal-examples.md` |
 | Execute machine recipe | `.cervorules/recipes/*.json` |
 
@@ -97,10 +97,10 @@ available.
 
 ## Consume packages
 
-Verify the generic package after publication:
+Verify the published GitHub Release:
 
 ```powershell
-bash scripts/release/verify-generic-package.sh v3.0.0-rc.5
+bash scripts/release/verify-github-release.sh v3.0.0-rc.5
 ```
 
 Verify the OCI image when enabled:

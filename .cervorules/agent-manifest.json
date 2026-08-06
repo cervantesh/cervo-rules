@@ -62,7 +62,7 @@
     "cervorules-vocabgen",
     "sonarqube"
   ],
-  "legacy_commands_repository": "CervoSoft/cervo-rules-v2 for v2 maintenance and historical migration/diff tooling",
+  "legacy_commands_repository": "cervantesh/cervo-rules-v2 for v2 maintenance and historical migration/diff tooling",
   "required_checks": [
     "go test -count=1 ./...",
     "go test -cover ./...",
