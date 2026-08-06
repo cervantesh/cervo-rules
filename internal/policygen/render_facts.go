@@ -527,6 +527,12 @@ func commentSafe(text string) string {
 			// Other control characters have no business in a comment and can
 			// hide text from a reader of the generated file.
 			continue
+		case r == '\uFEFF':
+			// A byte order mark is not a control character by codepoint, but
+			// go/scanner rejects it anywhere past offset 0 — including inside
+			// a comment. Left in, it turns a policy `check` accepts into a
+			// generation failure with an opaque parser error.
+			continue
 		default:
 			b.WriteRune(r)
 		}

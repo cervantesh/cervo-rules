@@ -113,7 +113,11 @@ func (i factIndex) names() []string {
 func buildFactIndex(vocab vocabularySpec, policy policySpec) (factIndex, error) {
 	index := factIndex{}
 	fields := map[string]string{}
-	for name, decl := range vocab.Facts {
+	// Sorted, not map order. Both loops below can fail, and iterating a Go map
+	// made which failure came first — and the names quoted in the message —
+	// vary between runs of the same input.
+	for _, name := range sortedKeys(vocab.Facts) {
+		decl := vocab.Facts[name]
 		normalized := normalize(name)
 		if normalized == "" {
 			return nil, fmt.Errorf("fact name is required")
@@ -145,8 +149,20 @@ func buildFactIndex(vocab vocabularySpec, policy policySpec) (factIndex, error) 
 		}
 		index[normalized] = factBinding{Name: normalized, Kind: kind, Values: values, Field: field}
 	}
-	for name, bounds := range policy.Facts {
+	// Policy fact keys are resolved with normalize(), so two keys can name one
+	// fact. Left unchecked, which entry supplied the bounds and which supplied
+	// the default came down to Go map iteration order: the same policy file
+	// passed `check` on some runs and failed on others, and when it passed it
+	// emitted a default the other entry's bounds forbid. `check` has to be a
+	// function of its input.
+	seenPolicyFacts := map[string]string{}
+	for _, name := range sortedKeys(policy.Facts) {
+		bounds := policy.Facts[name]
 		normalized := normalize(name)
+		if previous, ok := seenPolicyFacts[normalized]; ok {
+			return nil, fmt.Errorf("policy declares bounds for fact %q under two keys, %q and %q", normalized, previous, name)
+		}
+		seenPolicyFacts[normalized] = name
 		binding, ok := index[normalized]
 		if !ok {
 			return nil, fmt.Errorf("policy declares bounds for undeclared fact %q", name)
@@ -244,22 +260,35 @@ func applyFactBounds(binding *factBinding, bounds factBoundsSpec) error {
 }
 
 func checkDefaultWithinBounds(binding factBinding, value any) error {
-	var numeric float64
 	switch typed := value.(type) {
 	case float64:
-		numeric = typed
+		if binding.Min != nil && typed < *binding.Min {
+			return belowMinimum(binding, typed, *binding.Min)
+		}
+		if binding.Max != nil && typed > *binding.Max {
+			return aboveMaximum(binding, typed, *binding.Max)
+		}
 	case int64:
-		numeric = float64(typed)
-	default:
-		return nil
-	}
-	if binding.Min != nil && numeric < *binding.Min {
-		return fmt.Errorf("fact %q declares the default %v, which is below its own minimum %v", binding.Name, numeric, *binding.Min)
-	}
-	if binding.Max != nil && numeric > *binding.Max {
-		return fmt.Errorf("fact %q declares the default %v, which is above its own maximum %v", binding.Name, numeric, *binding.Max)
+		// Compared as int64, not widened to float64. An integer default just
+		// past 2^53 rounds when widened, so 2^53+1 compared equal to a maximum
+		// of 2^53 and passed. Bounds are already validated to be integral and
+		// within 2^53, so the conversion below is exact.
+		if binding.Min != nil && typed < int64(*binding.Min) {
+			return belowMinimum(binding, typed, *binding.Min)
+		}
+		if binding.Max != nil && typed > int64(*binding.Max) {
+			return aboveMaximum(binding, typed, *binding.Max)
+		}
 	}
 	return nil
+}
+
+func belowMinimum(binding factBinding, value any, min float64) error {
+	return fmt.Errorf("fact %q declares the default %v, which is below its own minimum %v", binding.Name, value, min)
+}
+
+func aboveMaximum(binding factBinding, value any, max float64) error {
+	return fmt.Errorf("fact %q declares the default %v, which is above its own maximum %v", binding.Name, value, max)
 }
 
 func checkFinite(name string, value *float64) error {
@@ -348,6 +377,17 @@ func containsString(values []string, want string) bool {
 		}
 	}
 	return false
+}
+
+// sortedKeys returns a map's keys in a stable order, so a failure and the names
+// it quotes are the same on every run.
+func sortedKeys[V any](values map[string]V) []string {
+	out := make([]string, 0, len(values))
+	for key := range values {
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // factFieldName derives the unexported frame field for a fact.

@@ -73,6 +73,14 @@ All notable changes to CervoRules will be documented in this file.
 
 ### Fixed
 
+- Fixed `check` not being a function of its input. A policy naming one fact
+  under two keys that normalize alike (`risk_pct:` and `RISK_PCT:`) resolved to
+  a single fact, but which key supplied the bounds and which supplied the
+  default came down to Go map iteration order: the same file passed `check` on
+  some runs and failed on others, and when it passed it emitted a default the
+  other entry's bounds forbid. Colliding keys are now rejected, and the fact
+  loops iterate in sorted order so a failure and the names it quotes are
+  identical on every run.
 - Fixed a fact `default` outside its own declared `min`/`max` being accepted.
   The generated parser returns the default before it reaches the bounds checks,
   so absence yielded exactly the value the same policy refuses when present.

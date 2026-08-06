@@ -768,6 +768,22 @@ func TestFactDeclarationErrorsFailGeneration(t *testing.T) {
 			"version: cervorules.policy.v3\nname: bad.v3\nfacts:\n  orders_last_hour: { max: 1e19 }\n",
 			"too large to represent exactly",
 		},
+		// Policy fact keys are resolved with normalize(), so two keys can name
+		// one fact. Which one supplied the bounds and which supplied the
+		// default came down to map iteration order: the same file passed check
+		// on some runs and failed on others.
+		"one fact under two keys that normalize alike": {
+			predicateVocab,
+			"version: cervorules.policy.v3\nname: bad.v3\nfacts:\n  risk_pct: { min: 0, max: 10 }\n  RISK_PCT: { default: 99 }\n",
+			`under two keys, "RISK_PCT" and "risk_pct"`,
+		},
+		// Widening an int64 default to float64 loses the bit that decides the
+		// comparison at the 2^53 boundary.
+		"integer default just past the exact range": {
+			predicateVocab,
+			"version: cervorules.policy.v3\nname: bad.v3\nfacts:\n  orders_last_hour: { max: 9007199254740992, default: 9007199254740993 }\n",
+			"above its own maximum",
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -891,6 +907,35 @@ func TestPolicyTextCannotEscapeIntoGeneratedCode(t *testing.T) {
 		t.Fatalf("the comparison must keep the authored literal:\n%s", out.Source)
 	}
 	compileGeneratedPolicyWithVocab(t, predicateVocabGo, out.Source, minimalTestSource)
+}
+
+// A byte order mark is not a control character by codepoint, so it survived the
+// comment sanitiser — and go/scanner rejects it anywhere past offset 0,
+// including inside a comment. That turned a policy `check` accepts into a
+// generation failure with an opaque parser error and a full-file dump.
+func TestCommentSanitiserHandlesNonControlTroublemakers(t *testing.T) {
+	// Escapes, not literals: a raw byte order mark in this file is itself
+	// rejected by the Go scanner, which is the same trap from the other side.
+	for name, literal := range map[string]string{
+		"byte order mark":        "acme\uFEFFcorp",
+		"line separator":         "acme\u2028corp",
+		"paragraph separator":    "acme\u2029corp",
+		"zero width joiner":      "acme\u200Dcorp",
+		"right-to-left override": "acme\u202Ecorp",
+	} {
+		t.Run(name, func(t *testing.T) {
+			policy := "version: cervorules.policy.v3\nname: bom.v3\n" +
+				"defaults:\n  executor: manual\n" +
+				"denies:\n  - id: deny-tenant\n    operation: trade.place\n" +
+				"    when: { fact: style, op: eq, value: \"" + literal + "\" }\n" +
+				"routes:\n  - id: allow-trade\n    operation: trade.place\n    target: desk\n    executor: manual\n"
+			out, err := generatePredicatePolicy(t, predicateVocab, policy)
+			if err != nil {
+				t.Fatalf("check accepts this policy, so generation must not fail: %v", err)
+			}
+			compileGeneratedPolicyWithVocab(t, predicateVocabGo, out.Source, minimalTestSource)
+		})
+	}
 }
 
 // Two routes naming the same executor describe one fallback entry. Emitting one
