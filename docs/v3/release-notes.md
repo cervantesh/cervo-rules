@@ -3,6 +3,31 @@
 Notes for the current release candidate, followed by the ones it supersedes.
 Every entry here remains a release candidate, not GA final.
 
+## v3.0.0-rc.6
+
+A toolchain security bump on top of rc.5. No library behaviour changes.
+
+- Raised the minimum Go toolchain to 1.25.11. `govulncheck` reports
+  GO-2026-5037 in `crypto/x509` for go1.25.8, reachable from `limits.Check`
+  through `fmt.Sprintf` to `x509.HostnameError.Error`. The trace is generic --
+  any `fmt.Sprintf` over an error can reach it -- so the reachability is a
+  conservative over-approximation rather than a path this code deliberately
+  takes. The remedy is a toolchain bump either way.
+- The `go` directive in `go.mod` is the consumer-visible half of that: a
+  consumer still building with 1.25.8 links the affected standard library, and
+  the directive is what refuses it. `scripts/ci/setup-go-ci.sh` is the other
+  half, and is what CI installs.
+- The generated-policy tests now read the `go` directive from this module
+  rather than writing it literally into the temp consumer they compile. A
+  consumer declaring an older Go than the module it replaces fails with
+  "updates to go.mod needed", which is what the bump caused.
+
+The vulnerability was invisible to the local release gate: `govulncheck`
+reports the standard library of the toolchain running it, and the release
+operator's machine was on 1.26.5. Only CI, pinned to 1.25.8, could see it.
+
+Everything in rc.5 below still applies.
+
 ## v3.0.0-rc.5
 
 `v3.0.0-rc.5` makes a policy able to state the conditions under which it
@@ -126,18 +151,18 @@ go test -count=1 ./...
 go test -cover ./...
 go vet ./...
 go mod verify
-scripts/release/check.sh v3.0.0-rc.5 dist-release-check-v3.0.0-rc.5
+scripts/release/check.sh v3.0.0-rc.6 dist-release-check-v3.0.0-rc.6
 ```
 
 Windows PowerShell operators can run the same check through:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/release/check.ps1 v3.0.0-rc.5 dist-release-check-v3.0.0-rc.5
+powershell -ExecutionPolicy Bypass -File scripts/release/check.ps1 v3.0.0-rc.6 dist-release-check-v3.0.0-rc.6
 ```
 
 ## Verification After Package Publish
 
 ```bash
-scripts/release/verify-github-release.sh v3.0.0-rc.5
-scripts/release/verify-oci-tools.sh v3.0.0-rc.5
+scripts/release/verify-github-release.sh v3.0.0-rc.6
+scripts/release/verify-oci-tools.sh v3.0.0-rc.6
 ```

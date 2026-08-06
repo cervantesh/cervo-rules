@@ -2,7 +2,7 @@
 
 All notable changes to CervoRules will be documented in this file.
 
-## Unreleased
+## v3.0.0-rc.6 - 2026-08-06
 
 ### Security
 

@@ -36,7 +36,7 @@ Published files:
 Download a pinned schema bundle:
 
 ```powershell
-$version = "v3.0.0-rc.5"
+$version = "v3.0.0-rc.6"
 gh release download $version --repo cervantesh/cervo-rules `
   --pattern "cervorules-schemas-$version.tar.gz" --pattern "checksums.txt"
 ```
@@ -51,7 +51,7 @@ Get-Content checksums.txt
 On Linux, verify directly with `sha256sum`:
 
 ```bash
-version=v3.0.0-rc.5
+version=v3.0.0-rc.6
 sha256sum -c checksums.txt --ignore-missing
 tar -xzf "cervorules-schemas-${version}.tar.gz"
 ```
@@ -74,7 +74,7 @@ For v3 pre-releases after the physical split, the GitHub Release is
 runtime/schema-first:
 
 ```bash
-scripts/release/verify-github-release.sh v3.0.0-rc.5
+scripts/release/verify-github-release.sh v3.0.0-rc.6
 ```
 
 The verifier expects `release_module=github.com/cervantesh/cervo-rules/v3`,
@@ -86,12 +86,12 @@ The verifier also checks v3-native tool archives when present and verifies
 
 | Check | Consumer command or file | Expected proof |
 | --- | --- | --- |
-| Release assets download | `scripts/release/verify-github-release.sh v3.0.0-rc.5` | Downloads all generic files, verifies `checksums.txt`, and checks root plus v3 schemas. |
+| Release assets download | `scripts/release/verify-github-release.sh v3.0.0-rc.6` | Downloads all generic files, verifies `checksums.txt`, and checks root plus v3 schemas. |
 | v3 release module | `build-metadata.txt`, `artifact-manifest.json`, `sbom-modules.json`, `sbom-spdx.json`, `provenance.json` | Each artifact records `release_module=github.com/cervantesh/cervo-rules/v3` or `"release_module": "github.com/cervantesh/cervo-rules/v3"`. |
 | v3 dependency manifest | `release-dependencies.txt` | Captures `go list -m all` for the v3 root module. |
 | SBOM/provenance validation | `sbom-modules.json`, `sbom-spdx.json`, `provenance.json`, `artifact-manifest.json` | Verification confirms release version, v3 release module, commit presence, Go version, artifact names, SPDX marker, SLSA predicate type, source material, and builder provenance. |
 | Signed checksums | `checksums.txt.minisig` | Optional minisign signature is published when release signing secrets are configured. Consumers enable strict verification with `CERVORULES_VERIFY_SIGNATURES=1`. |
-| OCI pull/run verification | `scripts/release/verify-oci-tools.sh v3.0.0-rc.5` | Pulls the tools image, verifies both CLI `-version` commands, and verifies root plus v3 schemas at `/opt/cervorules/schemas`. |
+| OCI pull/run verification | `scripts/release/verify-oci-tools.sh v3.0.0-rc.6` | Pulls the tools image, verifies both CLI `-version` commands, and verifies root plus v3 schemas at `/opt/cervorules/schemas`. |
 
 ## v2.1.0-rc.1 Release/Package Verification Matrix
 
@@ -175,7 +175,7 @@ ghcr.io/cervantesh/cervorules-tools:<version>
 Pull and inspect a pinned image:
 
 ```powershell
-$version = "v3.0.0-rc.5"
+$version = "v3.0.0-rc.6"
 docker pull "ghcr.io/cervantesh/cervorules-tools:$version"
 docker run --rm "ghcr.io/cervantesh/cervorules-tools:$version" -c "cervorules-policygen -version"
 docker run --rm "ghcr.io/cervantesh/cervorules-tools:$version" -c "cervorules-vocabgen -version"
