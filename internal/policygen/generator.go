@@ -431,11 +431,21 @@ func validate(vocab vocabularySpec, policy policySpec) (policyPlan, error) {
 // needs, and returns the set of declared names.
 func validateConditions(policy policySpec) (map[string]struct{}, error) {
 	declared := make(map[string]struct{}, len(policy.Conditions))
-	for name, condition := range policy.Conditions {
+	// Sorted, and collision-checked, for the same reason the fact loops are:
+	// names are resolved with normalize(), so two keys can name one condition,
+	// and ranging a Go map made both which one won and which error surfaced
+	// first depend on iteration order.
+	seen := map[string]string{}
+	for _, name := range sortedKeys(policy.Conditions) {
+		condition := policy.Conditions[name]
 		if strings.TrimSpace(name) == "" {
 			return nil, errors.New("condition name is required")
 		}
 		normalized := normalize(name)
+		if previous, ok := seen[normalized]; ok {
+			return nil, fmt.Errorf("policy declares condition %q under two keys, %q and %q", normalized, previous, name)
+		}
+		seen[normalized] = name
 		switch condition.Kind {
 		case "transition_allowed":
 			if condition.Lifecycle == "" || condition.To == "" || condition.SubjectKey == "" {

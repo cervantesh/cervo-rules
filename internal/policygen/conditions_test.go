@@ -252,6 +252,34 @@ denies:
 	compileGeneratedPolicy(t, out.Source, minimalTestSource)
 }
 
+// Condition names are resolved with normalize(), so two keys can name one
+// condition. Ranging a Go map made which one won depend on iteration order —
+// the same defect the policy fact block had, in its sibling code path.
+func TestOneConditionUnderTwoKeysFailsGeneration(t *testing.T) {
+	policy := `
+version: cervorules.policy.v3
+name: collide
+defaults:
+  executor: primary
+conditions:
+  world_is_coherent:
+    kind: integrity
+  WORLD_IS_COHERENT:
+    kind: has_type
+    entity_type: order
+    subject_key: order_id
+`
+	for i := 0; i < 10; i++ {
+		_, err := generateConditionPolicy(t, policy)
+		if err == nil {
+			t.Fatal("two keys naming one condition must fail generation")
+		}
+		if !strings.Contains(err.Error(), `under two keys, "WORLD_IS_COHERENT" and "world_is_coherent"`) {
+			t.Fatalf("run %d: unexpected error: %v", i+1, err)
+		}
+	}
+}
+
 func TestDuplicateRequirementFailsGeneration(t *testing.T) {
 	policy := strings.Replace(conditionPolicy,
 		"requires: [refund_transition_legal]",
