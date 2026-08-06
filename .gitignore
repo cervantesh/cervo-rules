@@ -1,3 +1,5 @@
+dist/
+dist-release-check*/
 dist-performance-profiles/
 dist-performance-report/
 *.pprof
