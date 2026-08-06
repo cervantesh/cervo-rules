@@ -1,7 +1,54 @@
+# Compound predicates over typed facts.
+#
+# A predicate is a closed tagged form, not an expression string: composition is
+# all / any / not, and a leaf compares one declared fact against a literal,
+# against another fact, or consults a named condition. It compiles to Go
+# boolean expressions in the generated policy, so there is no evaluator at
+# runtime and no expression engine to sandbox.
+#
+# Every threshold below is inside the bytes the PolicyHash covers. Editing 5.0
+# to 50.0 moves the hash, which is what makes the change auditable.
+
 version: cervorules.policy.v3
 name: predicate-composition.v3
+
 defaults:
   executor: standard_executor
+
+facts:
+  queue_depth: { min: 0 }
+  error_rate_pct: { min: 0, max: 100 }
+  # A service that never stated a budget gets the conservative one. The default
+  # is a policy statement about what absence means, not a convenience.
+  error_budget_pct: { min: 0, max: 100, default: 1 }
+
+# Ordered: the first matching deny wins. A deny with no `operation` applies to
+# every operation in the vocabulary.
+denies:
+  - id: deny-change-freeze
+    reason: a change freeze is in effect
+    when:
+      all:
+        - { fact: change_freeze, op: is_true }
+        - { fact: environment, op: eq, value: production }
+
+  - id: deny-unhealthy-target
+    operation: message_create
+    reason: the worker is saturated, or it is burning its error budget
+    when:
+      any:
+        - { fact: queue_depth, op: gte, value: 10000 }
+        - { fact: error_rate_pct, op: gt, fact_value: error_budget_pct }
+
+  - id: deny-unreviewed-production-deploy
+    operation: deploy
+    reason: a production deploy needs a healthy target
+    when:
+      all:
+        - { fact: environment, op: eq, value: production }
+        - not:
+            { fact: error_rate_pct, op: lt, value: 0.5 }
+
 routes:
   - id: message_create
     operation: message_create
@@ -9,13 +56,97 @@ routes:
     executor: standard_executor
   - id: deploy
     operation: deploy
-    target: message_worker
+    target: deployer
     executor: standard_executor
+
 tests:
-  - name: message_create routes
+  - name: a healthy dev request routes
     request:
       operation: message_create
+      metadata:
+        environment: dev
+        change_freeze: "false"
+        queue_depth: "12"
+        error_rate_pct: "0.1"
+        error_budget_pct: "1"
     expect:
       allow: true
       target: message_worker
       executor: standard_executor
+
+  - name: either disjunct denies on its own — saturation
+    request:
+      operation: message_create
+      metadata:
+        environment: dev
+        change_freeze: "false"
+        queue_depth: "10000"
+        error_rate_pct: "0.1"
+        error_budget_pct: "1"
+    expect:
+      allow: false
+      reason: the worker is saturated, or it is burning its error budget
+
+  - name: either disjunct denies on its own — error budget
+    request:
+      operation: message_create
+      metadata:
+        environment: dev
+        change_freeze: "false"
+        queue_depth: "12"
+        error_rate_pct: "2.5"
+        error_budget_pct: "1"
+    expect:
+      allow: false
+      reason: the worker is saturated, or it is burning its error budget
+
+  - name: a freeze denies every operation in production
+    request:
+      operation: deploy
+      metadata:
+        environment: production
+        change_freeze: "true"
+        queue_depth: "12"
+        error_rate_pct: "0.1"
+        error_budget_pct: "1"
+    expect:
+      allow: false
+      reason: a change freeze is in effect
+
+  - name: a freeze outside production does not deny
+    request:
+      operation: deploy
+      metadata:
+        environment: staging
+        change_freeze: "true"
+        queue_depth: "12"
+        error_rate_pct: "0.1"
+        error_budget_pct: "1"
+    expect:
+      allow: true
+      target: deployer
+
+  - name: a production deploy needs a low error rate
+    request:
+      operation: deploy
+      metadata:
+        environment: production
+        change_freeze: "false"
+        queue_depth: "12"
+        error_rate_pct: "0.9"
+        error_budget_pct: "1"
+    expect:
+      allow: false
+      reason: a production deploy needs a healthy target
+
+  - name: an absent error budget falls back to the declared default
+    request:
+      operation: message_create
+      metadata:
+        environment: dev
+        change_freeze: "false"
+        queue_depth: "12"
+        error_rate_pct: "2.0"
+    expect:
+      allow: false
+      reason: the worker is saturated, or it is burning its error budget

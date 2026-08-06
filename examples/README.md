@@ -13,6 +13,9 @@ Use examples as policy shapes, not as domain vocabulary to copy blindly.
   singletons and bounded request facts.
 - `guarded-refund`: a named policy condition backed by an ontology lifecycle,
   for actions that must not be applied twice.
+- `predicate-composition`: typed facts and compound `when` predicates, including
+  disjunctions, a fact-to-fact comparison, a declared default, and an
+  operation-wide deny.
 - `conformance/*`: tiny fixtures for billing, document processing, device
   routing, queue events, scheduled jobs, CLI commands, and edge requests.
 
@@ -38,11 +41,16 @@ See `docs/performance/hot-path.md` for the production checklist.
 
 ## Policy Shape
 
-The v3-native generator currently supports deterministic operation routing:
-`operation`, `target`, `executor`, optional `fallback_executors`, optional
-`disabled_by_default`, explicit denies, and generated test cases. Compound
-predicate DSL support is future v3 work, not part of the current generator
-contract.
+The v3-native generator supports deterministic operation routing — `operation`,
+`target`, `executor`, optional `fallback_executors`, optional
+`disabled_by_default` — plus ordered denies, named conditions with `requires`,
+typed facts, compound `when` predicates over them, and generated test cases.
+
+A fact is declared in the vocabulary (name and type) and constrained in the
+policy (`min`, `max`, `default`). That split is deliberate: the `PolicyHash` is
+taken over the policy file, so every decision-bearing number lives where the
+hash covers it. See `predicate-composition` for the shape and
+`docs/v3/policygen-dsl.md` for the leaf forms.
 
 ## Commands
 

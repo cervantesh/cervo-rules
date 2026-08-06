@@ -41,6 +41,27 @@ routes:
 // minimum that still compiles when a case has nothing extra to assert.
 const minimalTestSource = "package policyrules\n"
 
+const conditionVocabGo = `package policyvocab
+
+import "github.com/cervantesh/cervo-rules/v3/core"
+
+const (
+	OperationRefund core.Operation = "refund"
+	OperationShip   core.Operation = "ship"
+	TargetLedger    core.Target    = "ledger"
+	TargetFulfilment core.Target   = "fulfilment"
+	ExecutorPrimary core.Executor  = "primary"
+)
+
+func Vocabulary() core.Vocabulary {
+	return core.NewVocabulary(
+		core.AllowedOperations(OperationRefund, OperationShip),
+		core.AllowedTargets(TargetLedger, TargetFulfilment),
+		core.AllowedExecutors(ExecutorPrimary),
+	)
+}
+`
+
 func generateConditionPolicy(t *testing.T, policy string) (Output, error) {
 	t.Helper()
 	return Generate(Options{
@@ -103,6 +124,48 @@ func TestBuildRefusesWithoutConditions(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "missing_conditions") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+`)
+}
+
+// mergeRuntimeConfig used to drop the caller's evaluator, and since
+// DefaultConfig cannot supply one, ValidateConfig then rejected every
+// condition-gated policy. The feature was unusable end to end.
+func TestGeneratedPolicyBuildsWithACallerSuppliedEvaluator(t *testing.T) {
+	out, err := generateConditionPolicy(t, conditionPolicy)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	compileGeneratedPolicyWithVocab(t, conditionVocabGo, out.Source, `package policyrules
+
+import (
+	"context"
+	"testing"
+
+	cervorules "github.com/cervantesh/cervo-rules/v3/core"
+	cervoruntime "github.com/cervantesh/cervo-rules/v3/runtime"
+)
+
+func TestBuildAcceptsConditions(t *testing.T) {
+	build := func(legal bool) cervorules.Engine {
+		engine, err := NewPolicyFactory().Build(context.Background(), cervoruntime.PolicyRuntimeConfig{
+			Conditions: cervorules.ConditionSet{
+				"refund_transition_legal": func(context.Context, cervorules.Request) (bool, error) { return legal, nil },
+			},
+		})
+		if err != nil {
+			t.Fatalf("build: %v", err)
+		}
+		return engine
+	}
+	allowed, err := build(true).Decide(context.Background(), cervorules.Request{Operation: cervorules.Operation("refund")})
+	if err != nil || !allowed.Decision.Allow {
+		t.Fatalf("a legal transition must allow: %#v %v", allowed.Decision, err)
+	}
+	denied, err := build(false).Decide(context.Background(), cervorules.Request{Operation: cervorules.Operation("refund")})
+	if err != nil || denied.Decision.Allow {
+		t.Fatalf("an illegal transition must deny: %#v %v", denied.Decision, err)
 	}
 }
 `)

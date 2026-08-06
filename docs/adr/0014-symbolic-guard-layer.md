@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Accepted, amended on 2026-08-05 by
+[ADR 0016](0016-compound-predicates-over-typed-facts.md).
 
 ## Context
 
@@ -81,6 +82,16 @@ it, because there is no proof the shape is right. Mitigation: wire
 which converts speculative surface into justified surface. Until that lands,
 treat the placement as provisional.
 
+*Amended 2026-08-05.* The wiring shipped, but it did not work: the generated
+`mergeRuntimeConfig` copied every other config field and dropped `Conditions`,
+and since `DefaultConfig` cannot supply an evaluator, `ValidateConfig` then
+refused every condition-gated build. No policy declaring a condition could be
+constructed at all. The tests covered the nil-evaluator case and the generated
+source text, so nothing exercised a successful build. Fixed under ADR 0016, with
+a regression test that builds with a real evaluator and decides both ways. The
+placement is no longer provisional: `Condition` is consulted by generated
+engines and reachable from a `when` predicate as a leaf.
+
 **A snapshot must be resolved per request.** The first implementation made this
 worse than stated: `Guard.Holds` resolved on *every* condition, so a policy
 consulting three conditions cost three resolver round-trips for one decision.
@@ -135,4 +146,8 @@ of new facts; this layer owns refutation of an incoherent world. Merging them
 would put constraint checking on the derivation path.
 
 **Put constraints in the policy DSL only.** Rejected as a starting point. The Go
-API has to exist first; DSL surface for it is a separate decision.
+API has to exist first; DSL surface for it is a separate decision. *That
+decision was taken on 2026-08-05 in
+[ADR 0016](0016-compound-predicates-over-typed-facts.md), which adds declarative
+predicates over typed facts and keeps `condition` reachable as a predicate leaf,
+so an ontology guard composes with a fact comparison in one rule.*

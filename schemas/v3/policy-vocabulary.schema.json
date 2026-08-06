@@ -20,9 +20,39 @@
       "type": "object",
       "additionalProperties": { "$ref": "#/$defs/entry" },
       "description": "Caller-owned executor names selected by policies."
+    },
+    "facts": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/factName" },
+      "additionalProperties": { "$ref": "#/$defs/fact" },
+      "description": "Caller-owned fact names a policy predicate can read from Request.Metadata. The vocabulary declares what a fact is; the policy declares the thresholds, bounds and defaults applied to it, so every decision-bearing number stays inside the PolicyHash."
     }
   },
   "$defs": {
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["number", "integer", "bool", "enum", "string"] },
+        "values": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Required for type enum, forbidden otherwise. A value outside this domain fails the decision."
+        },
+        "description": { "type": "string" },
+        "go_name": { "$ref": "#/$defs/identifier" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "enum" } }, "required": ["type"] },
+          "then": { "required": ["values"] },
+          "else": { "not": { "required": ["values"] } }
+        }
+      ]
+    },
     "entry": {
       "type": "object",
       "additionalProperties": false,
@@ -35,6 +65,12 @@
       "type": "string",
       "minLength": 1,
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "factName": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$",
+      "description": "Must match the identifier pattern a policy predicate uses to reference a fact. Without this, a vocabulary could declare a fact no schema-valid policy is able to name."
     }
   }
 }

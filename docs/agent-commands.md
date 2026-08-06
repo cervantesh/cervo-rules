@@ -43,8 +43,8 @@ v3 API.
 ## Publish packages
 
 ```powershell
-bash scripts/release/verify-generic-package.sh v3.0.0-rc.3
-bash scripts/release/verify-oci-tools.sh v3.0.0-rc.3
+bash scripts/release/verify-generic-package.sh v3.0.0-rc.5
+bash scripts/release/verify-oci-tools.sh v3.0.0-rc.5
 ```
 
 Use the actual release tag for future releases.

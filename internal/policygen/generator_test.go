@@ -11,6 +11,7 @@ import (
 const sampleVocab = `
 operations:
   invoice_read: {}
+  unknown_operation: {}
 targets:
   ledger_api: {}
 executors:
@@ -161,15 +162,54 @@ routes:
 			want: "missing operation",
 		},
 		{
-			name:  "missing deny operation",
+			// A deny naming an operation the vocabulary does not declare used to
+			// generate, compile, and never fire.
+			name:  "unknown deny operation",
 			vocab: sampleVocab,
 			policy: `
 version: cervorules.policy.v3
 name: bad.v3
 denies:
-  - reason: no operation
+  - id: typo
+    operation: invoice_raed
+    reason: never fires
 `,
-			want: "missing operation",
+			want: `unknown operation "invoice_raed" in deny "typo"`,
+		},
+		{
+			// `reason` falls back to `id`, so a deny with neither denies every
+			// operation with an empty reason and an unnamed trace step. The id
+			// is what an audit record keys on; a deny that cannot be named is
+			// not auditable.
+			name:  "deny without an id",
+			vocab: sampleVocab,
+			policy: `
+version: cervorules.policy.v3
+name: bad.v3
+denies:
+  - reason: no identifier
+`,
+			want: "every deny needs an id",
+		},
+		{
+			// Two routes on one operation used to emit a Go map literal with
+			// duplicate constant keys, which only failed in the consumer build.
+			name:  "duplicate route operation",
+			vocab: sampleVocab,
+			policy: `
+version: cervorules.policy.v3
+name: bad.v3
+routes:
+  - id: first
+    operation: invoice_read
+    target: ledger_api
+    executor: ledger_primary
+  - id: second
+    operation: invoice_read
+    target: ledger_api
+    executor: ledger_backup
+`,
+			want: "both route operation",
 		},
 		{
 			name:  "missing test operation",
@@ -608,9 +648,25 @@ func TestGenerateRejectsBadOptions(t *testing.T) {
 
 func compileGeneratedPolicy(t *testing.T, source string, testSource string) {
 	t.Helper()
+	compileGeneratedPolicyWithVocab(t, sampleVocabGo, source, testSource)
+}
+
+func compileGeneratedPolicyWithVocab(t *testing.T, vocabGo string, source string, testSource string) {
+	t.Helper()
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "go.mod"), "module example.test/generated\n\ngo 1.25.8\n\nrequire github.com/cervantesh/cervo-rules/v3 v3.0.0\n\nreplace github.com/cervantesh/cervo-rules/v3 => "+filepath.ToSlash(repoRoot(t))+"\n")
-	writeFile(t, filepath.Join(dir, "policyvocab", "vocab.go"), `package policyvocab
+	writeFile(t, filepath.Join(dir, "policyvocab", "vocab.go"), vocabGo)
+	writeFile(t, filepath.Join(dir, "policyrules", "generated_policy.go"), source)
+	writeFile(t, filepath.Join(dir, "policyrules", "generated_policy_test.go"), testSource)
+	cmd := exec.Command("go", "test", "./...")
+	cmd.Dir = dir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("generated policy did not compile: %v\n%s", err, output)
+	}
+}
+
+const sampleVocabGo = `package policyvocab
 
 import "github.com/cervantesh/cervo-rules/v3/core"
 
@@ -629,16 +685,7 @@ func Vocabulary() core.Vocabulary {
 		core.AllowedExecutors(ExecutorLedgerPrimary, ExecutorLedgerBackup),
 	)
 }
-`)
-	writeFile(t, filepath.Join(dir, "policyrules", "generated_policy.go"), source)
-	writeFile(t, filepath.Join(dir, "policyrules", "generated_policy_test.go"), testSource)
-	cmd := exec.Command("go", "test", "./...")
-	cmd.Dir = dir
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("generated policy did not compile: %v\n%s", err, output)
-	}
-}
+`
 
 func repoRoot(t *testing.T) string {
 	t.Helper()

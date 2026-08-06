@@ -1,12 +1,12 @@
 {
   "project": "CervoRules",
-  "current_version": "v3.0.0-rc.4",
+  "current_version": "v3.0.0-rc.5",
   "status": "v3-release-candidate",
   "module": "github.com/cervantesh/cervo-rules/v3",
   "repository_layout": "v3-root",
   "legacy_v2_repository": "https://github.com/cervantesh/cervo-rules-v2",
   "next_major": {
-    "target_version": "v3.0.0-rc.4",
+    "target_version": "v3.0.0-rc.5",
     "module": "github.com/cervantesh/cervo-rules/v3",
     "migration": "docs/v3/migration-v2-to-v3.md",
     "api_reference": "docs/v3/api-reference.md",
@@ -25,6 +25,10 @@
   "schemas": [
     ".cervorules/schemas/agent-manifest.schema.json",
     ".cervorules/schemas/task-recipe.schema.json",
+    "schemas/v3/policy-rules.schema.json",
+    "schemas/v3/policy-vocabulary.schema.json"
+  ],
+  "legacy_v1_schemas": [
     "schemas/policy-rules.schema.json",
     "schemas/policy-vocabulary.schema.json"
   ],
@@ -39,6 +43,8 @@
     "docs/package-minimal-examples.md",
     "examples/performance-hot-path",
     "examples/logic-facts",
+    "examples/predicate-composition",
+    "examples/guarded-refund",
     "examples/conformance"
   ],
   "packages": [

@@ -198,6 +198,127 @@ func TestCheckConsumerConformanceReportsClearErrors(t *testing.T) {
 	}
 }
 
+// A refused decision is a first-class outcome of a policy with typed facts: an
+// absent or unusable fact fails the decision instead of reporting a predicate
+// as unsatisfied. Until RuntimeCase could express it, a consumer certifying
+// against this contract could not cover the failure mode the feature exists to
+// produce.
+func TestRuntimeCaseCertifiesRefusalsAndTraceSteps(t *testing.T) {
+	factory := refusingFactory{code: core.ErrorCodeMissingFact}
+	contract := baseContract("fact-refusal", []testkit.RuntimeCase{{
+		Name:          "missing fact refuses the decision",
+		Factory:       factory,
+		Config:        factory.DefaultConfig(),
+		Request:       core.Request{Operation: core.Operation("invoice.read")},
+		WantErrorCode: core.ErrorCodeMissingFact,
+	}}, nil)
+	if err := testkit.CheckConsumerConformance(contract); err != nil {
+		t.Fatalf("expected the refusal case to pass: %v", err)
+	}
+
+	t.Run("a different code fails the case", func(t *testing.T) {
+		contract.RuntimeCases[0].WantErrorCode = core.ErrorCodeInvalidFact
+		err := testkit.CheckConsumerConformance(contract)
+		if err == nil || !strings.Contains(err.Error(), "expected invalid_fact, got missing_fact") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("a decision that succeeds fails the case", func(t *testing.T) {
+		deciding := routeFactory("ok", core.Operation("invoice.read"), core.Target("billing-ledger"), core.Executor("ledger-primary"))
+		passing := baseContract("no-refusal", []testkit.RuntimeCase{{
+			Name:          "expects a refusal that never comes",
+			Factory:       deciding,
+			Config:        deciding.DefaultConfig(),
+			Request:       core.Request{Operation: core.Operation("invoice.read")},
+			WantErrorCode: core.ErrorCodeMissingFact,
+		}}, nil)
+		err := testkit.CheckConsumerConformance(passing)
+		if err == nil || !strings.Contains(err.Error(), "expected the decision to fail with missing_fact") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("trace step names are checked", func(t *testing.T) {
+		traced := tracingFactory{steps: []string{"deny-risky", "allow-invoice"}}
+		good := baseContract("trace", []testkit.RuntimeCase{{
+			Name:               "names the rules that ran",
+			Factory:            traced,
+			Config:             traced.DefaultConfig(),
+			Request:            core.Request{Operation: core.Operation("invoice.read")},
+			Options:            core.NewDecisionOptions(core.WithTrace(true)),
+			WantTraceStepNames: []string{"deny-risky", "allow-invoice"},
+		}}, nil)
+		if err := testkit.CheckConsumerConformance(good); err != nil {
+			t.Fatalf("expected the trace case to pass: %v", err)
+		}
+		good.RuntimeCases[0].WantTraceStepNames = []string{"deny-risky", "something-else"}
+		err := testkit.CheckConsumerConformance(good)
+		if err == nil || !strings.Contains(err.Error(), `trace step 1: got "allow-invoice"`) {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+}
+
+// refusingFactory builds an engine whose every decision fails with a structured
+// code, standing in for a policy whose fact frame cannot be built.
+type refusingFactory struct{ code core.ErrorCode }
+
+func (f refusingFactory) DefaultConfig() runtime.PolicyRuntimeConfig {
+	return runtime.PolicyRuntimeConfig{DefaultExecutor: core.Executor("ledger-primary")}
+}
+func (f refusingFactory) ValidateConfig(runtime.PolicyRuntimeConfig) error { return nil }
+func (f refusingFactory) Build(context.Context, runtime.PolicyRuntimeConfig) (core.Engine, error) {
+	return refusingEngine{code: f.code}, nil
+}
+func (f refusingFactory) Metadata() runtime.PolicyMetadata {
+	return runtime.PolicyMetadata{Name: "refusing", DSLVersion: "v3", GeneratedWith: "testkit", VocabularyHash: "v", PolicyHash: "p"}
+}
+
+type refusingEngine struct{ code core.ErrorCode }
+
+func (e refusingEngine) Decide(ctx context.Context, req core.Request) (core.DecisionResult, error) {
+	return e.DecideWithOptions(ctx, req, core.DecisionOptions{})
+}
+func (e refusingEngine) DecideWithOptions(context.Context, core.Request, core.DecisionOptions) (core.DecisionResult, error) {
+	return core.DecisionResult{}, core.Error{
+		Code:      e.code,
+		Severity:  core.SeverityFatal,
+		Component: "policy",
+		Field:     "facts.risk_pct",
+		Reason:    "fact is absent from request metadata and the policy declares no default",
+	}
+}
+
+// tracingFactory builds an engine that reports the rules it evaluated.
+type tracingFactory struct{ steps []string }
+
+func (f tracingFactory) DefaultConfig() runtime.PolicyRuntimeConfig {
+	return runtime.PolicyRuntimeConfig{DefaultExecutor: core.Executor("ledger-primary")}
+}
+func (f tracingFactory) ValidateConfig(runtime.PolicyRuntimeConfig) error { return nil }
+func (f tracingFactory) Build(context.Context, runtime.PolicyRuntimeConfig) (core.Engine, error) {
+	return tracingEngine{steps: f.steps}, nil
+}
+func (f tracingFactory) Metadata() runtime.PolicyMetadata {
+	return runtime.PolicyMetadata{Name: "tracing", DSLVersion: "v3", GeneratedWith: "testkit", VocabularyHash: "v", PolicyHash: "p"}
+}
+
+type tracingEngine struct{ steps []string }
+
+func (e tracingEngine) Decide(ctx context.Context, req core.Request) (core.DecisionResult, error) {
+	return e.DecideWithOptions(ctx, req, core.DecisionOptions{})
+}
+func (e tracingEngine) DecideWithOptions(_ context.Context, req core.Request, options core.DecisionOptions) (core.DecisionResult, error) {
+	result := core.NewDecisionResult(req, core.Decision{}, core.WithTrace(options.TraceEnabled()))
+	if result.Trace != nil {
+		for i, name := range e.steps {
+			result.Trace.Steps = append(result.Trace.Steps, core.DecisionTraceStep{Name: name, Matched: i == len(e.steps)-1})
+		}
+	}
+	return result, nil
+}
+
 func syntheticConsumerConformanceContracts() []testkit.ConsumerConformanceContract {
 	return []testkit.ConsumerConformanceContract{
 		consumerContract("billing-routing", "invoice.read", "billing-ledger", "ledger-primary"),

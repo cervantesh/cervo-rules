@@ -61,12 +61,14 @@ type CodegenSnapshot struct {
 	Denies     int    `json:"denies"`
 	Tests      int    `json:"tests"`
 	Conditions int    `json:"conditions"`
+	Facts      int    `json:"facts"`
 }
 
 type vocabularySpec struct {
 	Operations map[string]vocabularyEntry `yaml:"operations"`
 	Targets    map[string]vocabularyEntry `yaml:"targets"`
 	Executors  map[string]vocabularyEntry `yaml:"executors"`
+	Facts      map[string]factDeclSpec    `yaml:"facts"`
 }
 
 type vocabularyEntry struct {
@@ -83,7 +85,8 @@ type policySpec struct {
 	Denies       []denySpec   `yaml:"denies"`
 	Tests        []testSpec   `yaml:"tests"`
 
-	Conditions map[string]conditionSpec `yaml:"conditions"`
+	Conditions map[string]conditionSpec  `yaml:"conditions"`
+	Facts      map[string]factBoundsSpec `yaml:"facts"`
 }
 
 // conditionSpec declares a named guard the policy can require. It mirrors the
@@ -104,22 +107,28 @@ type defaultsSpec struct {
 }
 
 type routeSpec struct {
-	ID                  string   `yaml:"id"`
-	Operation           string   `yaml:"operation"`
-	Target              string   `yaml:"target"`
-	Executor            string   `yaml:"executor"`
-	FallbackExecutors   []string `yaml:"fallback_executors"`
-	DisabledByDefault   bool     `yaml:"disabled_by_default"`
-	DisabledReason      string   `yaml:"disabled_reason"`
-	RequiresTrustedUser bool     `yaml:"requires_trusted_user"`
-	Requires            []string `yaml:"requires"`
+	ID                  string         `yaml:"id"`
+	Operation           string         `yaml:"operation"`
+	Target              string         `yaml:"target"`
+	Executor            string         `yaml:"executor"`
+	FallbackExecutors   []string       `yaml:"fallback_executors"`
+	DisabledByDefault   bool           `yaml:"disabled_by_default"`
+	DisabledReason      string         `yaml:"disabled_reason"`
+	RequiresTrustedUser bool           `yaml:"requires_trusted_user"`
+	Requires            []string       `yaml:"requires"`
+	When                *predicateSpec `yaml:"when"`
 }
 
+// denySpec carries an optional operation: an absent one applies the deny to
+// every operation in the vocabulary. That is only safe because a named
+// operation is now validated against the vocabulary, so an omission is a
+// choice and a typo is a build failure.
 type denySpec struct {
-	ID        string   `yaml:"id"`
-	Operation string   `yaml:"operation"`
-	Reason    string   `yaml:"reason"`
-	Requires  []string `yaml:"requires"`
+	ID        string         `yaml:"id"`
+	Operation string         `yaml:"operation"`
+	Reason    string         `yaml:"reason"`
+	Requires  []string       `yaml:"requires"`
+	When      *predicateSpec `yaml:"when"`
 }
 
 type testSpec struct {
@@ -161,13 +170,33 @@ type vocabularyIndex struct {
 	executors  map[string]struct{}
 }
 
+// policyPlan is the validated model the renderer works from.
+type policyPlan struct {
+	facts factIndex
+	// referenced holds, in stable order, the facts some predicate reads. The
+	// generated frame parses exactly these: no more, so a policy pays only for
+	// the facts it consults, and no fewer, so the decision does not depend on
+	// which rule happened to run first.
+	referenced []string
+}
+
+func (p policyPlan) usesFacts() bool { return len(p.referenced) > 0 }
+
+func (p policyPlan) bindings() []factBinding {
+	out := make([]factBinding, 0, len(p.referenced))
+	for _, name := range p.referenced {
+		out = append(out, p.facts[name])
+	}
+	return out
+}
+
 // Check validates v3 vocabulary and policy YAML without generating code.
 func Check(options Options) (Output, error) {
 	vocab, policy, err := load(options)
 	if err != nil {
 		return Output{}, err
 	}
-	if err := validate(vocab.spec, policy.spec); err != nil {
+	if _, err := validate(vocab.spec, policy.spec); err != nil {
 		return Output{}, err
 	}
 	return Output{
@@ -185,14 +214,15 @@ func Generate(options Options) (Output, error) {
 	if err != nil {
 		return Output{}, err
 	}
-	if err := validate(vocab.spec, policy.spec); err != nil {
+	plan, err := validate(vocab.spec, policy.spec)
+	if err != nil {
 		return Output{}, err
 	}
 	importRoot := strings.TrimSpace(options.CervoRulesImport)
 	if importRoot == "" {
 		importRoot = defaultCervoRulesPath
 	}
-	source, err := renderPolicySource(options, importRoot, policy, vocab)
+	source, err := renderPolicySource(options, importRoot, policy, vocab, plan)
 	if err != nil {
 		return Output{}, err
 	}
@@ -274,63 +304,106 @@ func normalizeVocabulary(vocab *vocabularySpec) {
 	if vocab.Executors == nil {
 		vocab.Executors = map[string]vocabularyEntry{}
 	}
+	if vocab.Facts == nil {
+		vocab.Facts = map[string]factDeclSpec{}
+	}
 }
 
-func validate(vocab vocabularySpec, policy policySpec) error {
+func validate(vocab vocabularySpec, policy policySpec) (policyPlan, error) {
 	if policy.Version != supportedPolicyVersion {
-		return fmt.Errorf("unsupported policy version %q", policy.Version)
+		return policyPlan{}, fmt.Errorf("unsupported policy version %q", policy.Version)
 	}
 	if strings.TrimSpace(policy.Name) == "" {
-		return errors.New("policy name is required")
+		return policyPlan{}, errors.New("policy name is required")
 	}
 	index := newVocabularyIndex(vocab)
 	if policy.Defaults.Executor != "" {
 		if !index.hasExecutor(policy.Defaults.Executor) {
-			return fmt.Errorf("unknown executor %q in defaults", policy.Defaults.Executor)
+			return policyPlan{}, fmt.Errorf("unknown executor %q in defaults", policy.Defaults.Executor)
 		}
 	}
+	// Two routes on one operation used to emit a Go map literal with duplicate
+	// constant keys: check passed, generate passed, and the consumer's build
+	// failed. Catching it here keeps the failure where the mistake is.
+	seenRouteOperations := map[string]string{}
 	for _, route := range policy.Routes {
 		if strings.TrimSpace(route.Operation) == "" {
-			return fmt.Errorf("route %q missing operation", route.ID)
+			return policyPlan{}, fmt.Errorf("route %q missing operation", route.ID)
 		}
 		if !index.hasOperation(route.Operation) {
-			return fmt.Errorf("unknown operation %q in route %q", route.Operation, route.ID)
+			return policyPlan{}, fmt.Errorf("unknown operation %q in route %q", route.Operation, route.ID)
 		}
+		normalized := normalize(route.Operation)
+		if previous, ok := seenRouteOperations[normalized]; ok {
+			return policyPlan{}, fmt.Errorf("routes %q and %q both route operation %q", previous, route.ID, route.Operation)
+		}
+		seenRouteOperations[normalized] = route.ID
 		if !index.hasTarget(route.Target) {
-			return fmt.Errorf("unknown target %q in route %q", route.Target, route.ID)
+			return policyPlan{}, fmt.Errorf("unknown target %q in route %q", route.Target, route.ID)
 		}
 		if !index.hasExecutor(route.Executor) {
-			return fmt.Errorf("unknown executor %q in route %q", route.Executor, route.ID)
+			return policyPlan{}, fmt.Errorf("unknown executor %q in route %q", route.Executor, route.ID)
 		}
 		for _, executor := range route.FallbackExecutors {
 			if !index.hasExecutor(executor) {
-				return fmt.Errorf("unknown executor %q in route %q fallback", executor, route.ID)
+				return policyPlan{}, fmt.Errorf("unknown executor %q in route %q fallback", executor, route.ID)
 			}
 		}
 	}
 	declaredConditions, err := validateConditions(policy)
 	if err != nil {
-		return err
+		return policyPlan{}, err
 	}
+	facts, err := buildFactIndex(vocab, policy)
+	if err != nil {
+		return policyPlan{}, err
+	}
+	referenced := map[string]struct{}{}
 	for _, route := range policy.Routes {
 		if err := validateRequires(declaredConditions, route.Requires, "route", route.ID); err != nil {
-			return err
+			return policyPlan{}, err
+		}
+		if route.When == nil {
+			continue
+		}
+		if err := validatePredicate(*route.When, facts, declaredConditions, referenced, fmt.Sprintf("route %q when", route.ID)); err != nil {
+			return policyPlan{}, err
 		}
 	}
 	for _, deny := range policy.Denies {
-		if strings.TrimSpace(deny.Operation) == "" {
-			return fmt.Errorf("deny %q missing operation", deny.ID)
+		// The id is what a trace step reports and what an audit record keys on.
+		// Without it a deny that fires is anonymous, and since `reason` falls
+		// back to `id`, a deny with neither denies every operation with an
+		// empty reason and an unnamed trace step.
+		if strings.TrimSpace(deny.ID) == "" {
+			return policyPlan{}, errors.New("every deny needs an id: it is the rule name reported in the decision trace")
+		}
+		// An absent operation means every operation. A present one must exist:
+		// a typo here used to generate a rule that could never fire.
+		if operation := strings.TrimSpace(deny.Operation); operation != "" && !index.hasOperation(operation) {
+			return policyPlan{}, fmt.Errorf("unknown operation %q in deny %q", deny.Operation, deny.ID)
 		}
 		if err := validateRequires(declaredConditions, deny.Requires, "deny", deny.ID); err != nil {
-			return err
+			return policyPlan{}, err
+		}
+		if deny.When == nil {
+			continue
+		}
+		if err := validatePredicate(*deny.When, facts, declaredConditions, referenced, fmt.Sprintf("deny %q when", deny.ID)); err != nil {
+			return policyPlan{}, err
 		}
 	}
 	for _, test := range policy.Tests {
 		if test.Request.Operation == "" {
-			return fmt.Errorf("test %q missing request operation", test.Name)
+			return policyPlan{}, fmt.Errorf("test %q missing request operation", test.Name)
 		}
 	}
-	return nil
+	names := make([]string, 0, len(referenced))
+	for name := range referenced {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return policyPlan{facts: facts, referenced: names}, nil
 }
 
 // validateConditions checks each declared condition carries the fields its kind
@@ -452,6 +525,7 @@ func snapshotFor(policy loadedPolicy, vocab loadedVocabulary) CodegenSnapshot {
 		Denies:     len(policy.spec.Denies),
 		Tests:      len(policy.spec.Tests),
 		Conditions: len(policy.spec.Conditions),
+		Facts:      len(vocab.spec.Facts),
 	}
 }
 

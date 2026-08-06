@@ -16,6 +16,11 @@
       "additionalProperties": { "$ref": "#/$defs/condition" },
       "description": "Named guards a rule can require. Names are referenced by route and deny `requires` lists; the evaluator is supplied at build time through PolicyRuntimeConfig.Conditions."
     },
+    "facts": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/factBounds" },
+      "description": "Per-policy bounds and defaults for facts the vocabulary declares. Every number here is inside the bytes the PolicyHash covers, so changing a threshold changes the hash."
+    },
     "routes": { "type": "array", "items": { "$ref": "#/$defs/route" } },
     "denies": { "type": "array", "items": { "$ref": "#/$defs/deny" } },
     "tests": { "type": "array", "items": { "$ref": "#/$defs/testCase" } }
@@ -47,6 +52,70 @@
       "uniqueItems": true,
       "description": "Every named condition must hold for this rule to apply. A condition that cannot be answered fails the decision rather than skipping the rule."
     },
+    "factBounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "default": {
+          "type": ["number", "boolean", "string"],
+          "description": "Value used when the fact is absent from Request.Metadata. A default is a policy statement that absence means this value, not a convenience: without one, an absent fact fails the decision."
+        }
+      }
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "all": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/predicate" } },
+        "any": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/predicate" } },
+        "not": { "$ref": "#/$defs/predicate" },
+        "fact": { "$ref": "#/$defs/identifier" },
+        "op": { "enum": ["eq", "ne", "gt", "gte", "lt", "lte", "in", "is_true", "is_false"] },
+        "value": { "type": ["number", "boolean", "string"] },
+        "fact_value": { "$ref": "#/$defs/identifier" },
+        "values": { "type": "array", "minItems": 1, "items": { "type": ["number", "boolean", "string"] } },
+        "condition": { "$ref": "#/$defs/identifier" }
+      },
+      "oneOf": [
+        { "required": ["all"] },
+        { "required": ["any"] },
+        { "required": ["not"] },
+        { "required": ["fact", "op"] },
+        { "required": ["condition"] }
+      ],
+      "allOf": [
+        {
+          "if": { "required": ["op"], "properties": { "op": { "enum": ["is_true", "is_false"] } } },
+          "then": {
+            "allOf": [
+              { "not": { "required": ["value"] } },
+              { "not": { "required": ["fact_value"] } },
+              { "not": { "required": ["values"] } }
+            ]
+          }
+        },
+        {
+          "if": { "required": ["op"], "properties": { "op": { "const": "in" } } },
+          "then": {
+            "required": ["values"],
+            "allOf": [
+              { "not": { "required": ["value"] } },
+              { "not": { "required": ["fact_value"] } }
+            ]
+          }
+        },
+        {
+          "if": { "required": ["op"], "properties": { "op": { "enum": ["eq", "ne", "gt", "gte", "lt", "lte"] } } },
+          "then": {
+            "oneOf": [{ "required": ["value"] }, { "required": ["fact_value"] }],
+            "not": { "required": ["values"] }
+          }
+        }
+      ],
+      "description": "A closed tagged form, not an expression language. Composition is all/any/not; leaves compare one declared fact against a literal, against another fact of the same declared type, or consult a named condition. The oneOf fixes which form a node takes and the allOf fixes a leaf's arity, so a malformed node fails against the published contract and not only against the generator."
+    },
     "defaults": {
       "type": "object",
       "additionalProperties": false,
@@ -67,18 +136,26 @@
         "disabled_by_default": { "type": "boolean" },
         "disabled_reason": { "type": "string" },
         "requires_trusted_user": { "type": "boolean" },
-        "requires": { "$ref": "#/$defs/requires" }
+        "requires": { "$ref": "#/$defs/requires" },
+        "when": { "$ref": "#/$defs/predicate" }
       }
     },
     "deny": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["operation"],
+      "required": ["id"],
       "properties": {
-        "id": { "$ref": "#/$defs/identifier" },
-        "operation": { "$ref": "#/$defs/identifier" },
-        "reason": { "type": "string" },
-        "requires": { "$ref": "#/$defs/requires" }
+        "id": {
+          "$ref": "#/$defs/identifier",
+          "description": "Required. The rule's stable name: it is what a decision trace step reports and what an audit record keys on, so a deny that cannot be named is not auditable."
+        },
+        "operation": {
+          "$ref": "#/$defs/identifier",
+          "description": "Omit to apply this deny to every operation in the vocabulary. A named operation must exist in the vocabulary, so a typo fails generation instead of producing a rule that never fires."
+        },
+        "reason": { "type": "string", "description": "Free text for humans. Defaults to `id` when absent, so a denial never carries an empty reason." },
+        "requires": { "$ref": "#/$defs/requires" },
+        "when": { "$ref": "#/$defs/predicate" }
       }
     },
     "testCase": {
@@ -100,7 +177,11 @@
         "user": { "type": "string" },
         "channel": { "type": "string" },
         "operation": { "$ref": "#/$defs/identifier" },
-        "metadata": { "type": "object", "additionalProperties": { "type": "string" } }
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "number", "boolean"] },
+          "description": "Request metadata for the generated test. Values reach the engine as strings; a number or bool written unquoted is accepted because facts are usually numeric and quoting every one of them reads badly."
+        }
       }
     },
     "testExpect": {

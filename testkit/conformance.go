@@ -2,6 +2,7 @@ package testkit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -26,6 +27,12 @@ type ConsumerConformanceContract struct {
 
 // RuntimeCase verifies that a generated policy factory can validate config,
 // build an engine, and return the expected decision.
+//
+// A case either expects a decision or expects the decision to fail. Failing is
+// a first-class outcome, not an accident: a fact that is absent, unparseable,
+// non-finite or outside its declared bounds refuses the decision rather than
+// reporting a predicate as unsatisfied, and a consumer certifying against this
+// contract has to be able to cover that.
 type RuntimeCase struct {
 	Name         string
 	Factory      runtime.PolicyFactory
@@ -33,6 +40,16 @@ type RuntimeCase struct {
 	Request      core.Request
 	Options      core.DecisionOptions
 	WantDecision core.Decision
+
+	// WantErrorCode expects the decision to fail with this structured code
+	// instead of returning WantDecision. Typical values are
+	// core.ErrorCodeMissingFact, core.ErrorCodeInvalidFact and
+	// core.ErrorCodeUnknownCondition.
+	WantErrorCode core.ErrorCode
+
+	// WantTraceStepNames expects these rule identifiers, in order, in the
+	// decision trace. Options must enable trace for this to be checked.
+	WantTraceStepNames []string
 }
 
 // FactsEvaluator is the minimal v3 facts execution shape used by conformance
@@ -145,11 +162,56 @@ func checkRuntimeCase(contractName string, runtimeCase RuntimeCase) error {
 		return fmt.Errorf("%s: runtime case %s build: %w", contractName, name, err)
 	}
 	result, err := engine.DecideWithOptions(context.Background(), runtimeCase.Request, runtimeCase.Options)
+	if runtimeCase.WantErrorCode != "" {
+		return checkExpectedDecisionError(contractName, name, runtimeCase.WantErrorCode, err)
+	}
 	if err != nil {
 		return fmt.Errorf("%s: runtime case %s decide: %w", contractName, name, err)
 	}
 	if !reflect.DeepEqual(result.Decision, runtimeCase.WantDecision) {
 		return fmt.Errorf("%s: runtime case %s decision mismatch: got %+v want %+v", contractName, name, result.Decision, runtimeCase.WantDecision)
+	}
+	return checkTraceStepNames(contractName, name, runtimeCase.WantTraceStepNames, result)
+}
+
+// checkExpectedDecisionError requires a structured refusal. An unstructured
+// error would satisfy "it failed" while telling a consumer nothing about why,
+// which is the difference this contract exists to hold.
+func checkExpectedDecisionError(contractName, name string, want core.ErrorCode, err error) error {
+	if err == nil {
+		return fmt.Errorf("%s: runtime case %s expected the decision to fail with %s", contractName, name, want)
+	}
+	var single core.Error
+	if errors.As(err, &single) {
+		if single.Code != want {
+			return fmt.Errorf("%s: runtime case %s expected %s, got %s", contractName, name, want, single.Code)
+		}
+		return nil
+	}
+	var many core.Errors
+	if errors.As(err, &many) {
+		if !many.Has(want) {
+			return fmt.Errorf("%s: runtime case %s expected %s, got %v", contractName, name, want, many)
+		}
+		return nil
+	}
+	return fmt.Errorf("%s: runtime case %s expected structured error %s, got %T: %v", contractName, name, want, err, err)
+}
+
+func checkTraceStepNames(contractName, name string, want []string, result core.DecisionResult) error {
+	if len(want) == 0 {
+		return nil
+	}
+	if result.Trace == nil {
+		return fmt.Errorf("%s: runtime case %s expects trace steps but the case did not enable trace", contractName, name)
+	}
+	if len(result.Trace.Steps) != len(want) {
+		return fmt.Errorf("%s: runtime case %s expected %d trace steps, got %d", contractName, name, len(want), len(result.Trace.Steps))
+	}
+	for i, expected := range want {
+		if result.Trace.Steps[i].Name != expected {
+			return fmt.Errorf("%s: runtime case %s trace step %d: got %q want %q", contractName, name, i, result.Trace.Steps[i].Name, expected)
+		}
 	}
 	return nil
 }

@@ -17,3 +17,20 @@ jobs:
 
       - name: Test
         run: go test ./...
+
+      # The JSON Schemas are the published contract for policy authors and
+      # third-party tooling, and no Go check can read them without a new
+      # dependency. This is the only place a shipped policy document is
+      # validated against them, so it must fail rather than skip.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install schema validation tooling
+        run: python -m pip install --disable-pip-version-check pyyaml jsonschema
+
+      - name: Validate policy documents against the JSON Schemas
+        env:
+          CERVORULES_REQUIRE_SCHEMA_VALIDATION: '1'
+        run: python scripts/ci/validate-schemas.py

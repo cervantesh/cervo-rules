@@ -48,6 +48,11 @@ const (
 	ErrorCodeConditionFailed   ErrorCode = "condition_failed"
 	ErrorCodeMissingConditions ErrorCode = "missing_conditions"
 
+	// A policy predicate reads facts from Request.Metadata, which core owns, so
+	// the codes for an unusable fact belong here beside the conditions seam.
+	ErrorCodeMissingFact ErrorCode = "missing_fact"
+	ErrorCodeInvalidFact ErrorCode = "invalid_fact"
+
 	ErrorCodeBodyBytesExceeded ErrorCode = "body_bytes_exceeded"
 	ErrorCodeMaxTokensExceeded ErrorCode = "max_tokens_exceeded"
 	ErrorCodeStreamNotAllowed  ErrorCode = "stream_not_allowed"

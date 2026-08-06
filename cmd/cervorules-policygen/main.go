@@ -92,7 +92,8 @@ func runCheck(args []string, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "unsupported -format %q\n", *format)
 		return 2
 	}
-	fmt.Fprintf(stderr, "ok policy=%s routes=%d denies=%d tests=%d\n", out.Metadata.Name, out.Snapshot.Routes, out.Snapshot.Denies, out.Snapshot.Tests)
+	fmt.Fprintf(stderr, "ok policy=%s routes=%d denies=%d conditions=%d facts=%d tests=%d\n",
+		out.Metadata.Name, out.Snapshot.Routes, out.Snapshot.Denies, out.Snapshot.Conditions, out.Snapshot.Facts, out.Snapshot.Tests)
 	return 0
 }
 

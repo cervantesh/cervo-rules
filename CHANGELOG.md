@@ -2,6 +2,77 @@
 
 All notable changes to CervoRules will be documented in this file.
 
+## v3.0.0-rc.5 - 2026-08-05
+
+### Added
+
+- Added compound predicates over typed facts to the v3 policy DSL. The
+  vocabulary declares a fact's name and type in a new `facts:` block; the policy
+  declares its bounds and default in its own `facts:` block, and attaches a
+  `when:` predicate to a route or deny. Composition is `all` / `any` / `not`,
+  nestable, over leaves that compare one fact against a literal, against another
+  fact of the same type, or consult a named condition. See
+  [docs/v3/compound-predicates.md](docs/v3/compound-predicates.md).
+- Predicates compile to Go boolean expressions in the generated policy. There is
+  no evaluator at runtime and no new dependency: the grammar is a closed tagged
+  form the JSON Schema validates, deliberately too small to express anything but
+  a guard.
+- Every threshold, bound and default lives in the policy file, over whose raw
+  bytes the `PolicyHash` is taken. Editing a limit moves the hash.
+- Added `core.ErrorCodeMissingFact` and `core.ErrorCodeInvalidFact`. A fact that
+  is absent with no declared default, unparseable, non-finite, or outside its
+  declared bounds fails the decision with a structured error rather than
+  reporting a predicate as unsatisfied. `strconv.ParseFloat` accepts `"NaN"`,
+  and a non-finite value passes every comparison without matching any, so the
+  generated parser rejects it explicitly.
+- Generated engines now populate `DecisionTrace.Steps`: one step per evaluated
+  rule carrying the rule id, whether it matched, and which leaf decided it.
+  Trace remains opt-in per decision, so an untraced decision allocates nothing
+  for explanation.
+- `cervorules-vocabgen` emits a `Fact*` constant per declared fact, so a
+  misspelled metadata key in a consumer is a compile error.
+- Added a `facts` count to the `check` snapshot.
+
+### Changed
+
+- **Breaking for malformed policies.** A deny naming an operation the vocabulary
+  does not declare is now rejected at generation time. Previously it generated,
+  compiled, and never fired: a typo in a deny rule was a silent fail-open.
+- **Breaking for malformed policies.** Two routes on one operation are now
+  rejected at `check` time. Previously the generator emitted a Go map literal
+  with duplicate constant keys, so `check` and `generate` both passed and only
+  the consumer's build failed.
+- `denies` is now an ordered list evaluated in authored order, first match wins,
+  instead of a map keyed by operation. A policy can declare several denies for
+  the same operation, which is what a disjunction split across two rules needs.
+- `deny.operation` is now optional. An absent operation applies the deny to
+  every operation in the vocabulary.
+- `deny.reason` defaults to the rule's `id` when absent. Previously such a deny
+  produced an empty `Decision.Reason` in the audit record.
+- **Breaking for malformed policies.** `deny.id` is now required. Since `reason`
+  falls back to `id`, a deny with neither denied every operation with an empty
+  reason and an unnamed trace step. The id is what a trace step reports and what
+  an audit record keys on, so a deny that cannot be named is not auditable.
+- A route's decision trace step is now named with the route `id`, falling back
+  to the operation. It previously carried `reason`, which falls back to the
+  literal `"route matched"` — a name that identifies nothing.
+
+### Fixed
+
+- Fixed `generate -test-out` emitting a test file that did not compile for any
+  policy with no `tests:` block: the engine variable and the `core` import were
+  emitted unconditionally but only referenced by generated cases.
+- Fixed the generated test always failing for any policy declaring
+  `conditions:`. It asserted that `DefaultConfig` validates, which a
+  condition-gated policy can never do. It now asserts the fail-closed contract
+  instead, then supplies a stub evaluator answering true for each declared
+  condition so the declarative cases can run.
+- Fixed generated `mergeRuntimeConfig` dropping `PolicyRuntimeConfig.Conditions`
+  from the caller's config. Since `DefaultConfig` cannot supply an evaluator,
+  the merged config always had none and `ValidateConfig` then rejected the
+  build, which made every condition-gated policy impossible to build. The
+  `conditions` / `requires` feature added in rc.4 was unusable end to end.
+
 ## v3.0.0-rc.4 - 2026-08-05
 
 ### Added

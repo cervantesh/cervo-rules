@@ -6,3 +6,23 @@ targets:
   deployer: {}
 executors:
   standard_executor: {}
+
+# The vocabulary declares what a fact is. Its thresholds live in the policy,
+# because that is the file the PolicyHash covers.
+facts:
+  environment:
+    type: enum
+    values: [dev, staging, production]
+    description: Which environment the request targets.
+  queue_depth:
+    type: integer
+    description: Messages already waiting on the worker queue.
+  error_rate_pct:
+    type: number
+    description: Rolling error rate for the target, as a percentage.
+  error_budget_pct:
+    type: number
+    description: Error budget this service is allowed to spend.
+  change_freeze:
+    type: bool
+    description: Whether a change freeze is in effect.
