@@ -326,6 +326,7 @@ func validate(vocab vocabularySpec, policy policySpec) (policyPlan, error) {
 	// constant keys: check passed, generate passed, and the consumer's build
 	// failed. Catching it here keeps the failure where the mistake is.
 	seenRouteOperations := map[string]string{}
+	seenFallbacks := map[string]routeFallbacks{}
 	for _, route := range policy.Routes {
 		if strings.TrimSpace(route.Operation) == "" {
 			return policyPlan{}, fmt.Errorf("route %q missing operation", route.ID)
@@ -347,6 +348,20 @@ func validate(vocab vocabularySpec, policy policySpec) (policyPlan, error) {
 		for _, executor := range route.FallbackExecutors {
 			if !index.hasExecutor(executor) {
 				return policyPlan{}, fmt.Errorf("unknown executor %q in route %q fallback", executor, route.ID)
+			}
+		}
+		// Fallbacks live in runtime config keyed by executor, so two routes
+		// naming the same executor must agree on them. Disagreeing is not a
+		// merge to guess at: one of the two authored intents would be dropped.
+		if len(route.FallbackExecutors) > 0 {
+			executor := normalize(route.Executor)
+			fallbacks := normalizeAll(route.FallbackExecutors)
+			if previous, ok := seenFallbacks[executor]; ok {
+				if !equalStrings(previous.fallbacks, fallbacks) {
+					return policyPlan{}, fmt.Errorf("routes %q and %q give executor %q different fallback_executors", previous.route, route.ID, route.Executor)
+				}
+			} else {
+				seenFallbacks[executor] = routeFallbacks{route: route.ID, fallbacks: fallbacks}
 			}
 		}
 	}
@@ -536,6 +551,32 @@ func hash(data []byte) string {
 
 func normalize(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
+}
+
+// routeFallbacks records which route first declared an executor's fallbacks.
+type routeFallbacks struct {
+	route     string
+	fallbacks []string
+}
+
+func normalizeAll(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		out = append(out, normalize(value))
+	}
+	return out
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func sortedRoutes(routes []routeSpec) []routeSpec {

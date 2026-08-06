@@ -17,6 +17,11 @@ import (
 // schema-valid policy.
 var factNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
 
+// maxExactIntegerBound is the largest magnitude a float64 represents exactly.
+// Policy bounds are decoded as float64, so a larger integer bound could not be
+// written down faithfully, let alone compared against.
+const maxExactIntegerBound = 1 << 53
+
 // factKind is the declared type of a fact.
 //
 // The vocabulary declares the kind; the policy declares the bounds and the
@@ -189,10 +194,20 @@ func applyFactBounds(binding *factBinding, bounds factBoundsSpec) error {
 		}
 		// An integer fact compares as int64, so a fractional bound would be
 		// silently truncated into a different threshold than the one authored.
+		// Beyond 2^53 a float64 cannot represent every integer, and the
+		// generator's int64 conversion of an out-of-range value is
+		// implementation-defined: a bound above 2^63 became MinInt64, which
+		// silently drops the bound instead of enforcing it.
 		if binding.Kind == kindInteger {
 			for _, bound := range []*float64{bounds.Min, bounds.Max} {
-				if bound != nil && *bound != math.Trunc(*bound) {
+				if bound == nil {
+					continue
+				}
+				if *bound != math.Trunc(*bound) {
 					return fmt.Errorf("fact %q is an integer and cannot declare a fractional bound", binding.Name)
+				}
+				if math.Abs(*bound) > maxExactIntegerBound {
+					return fmt.Errorf("fact %q declares the integer bound %v, which is too large to represent exactly", binding.Name, *bound)
 				}
 			}
 		}
@@ -216,8 +231,34 @@ func applyFactBounds(binding *factBinding, bounds factBoundsSpec) error {
 	if err != nil {
 		return fmt.Errorf("fact %q default: %w", binding.Name, err)
 	}
+	// The generated parser returns the default before it reaches the bounds
+	// checks, so a default outside min/max is the one value the policy accepts
+	// while declaring it invalid: absence would allow exactly what presence
+	// refuses.
+	if err := checkDefaultWithinBounds(*binding, value); err != nil {
+		return err
+	}
 	binding.Default = value
 	binding.HasDefault = true
+	return nil
+}
+
+func checkDefaultWithinBounds(binding factBinding, value any) error {
+	var numeric float64
+	switch typed := value.(type) {
+	case float64:
+		numeric = typed
+	case int64:
+		numeric = float64(typed)
+	default:
+		return nil
+	}
+	if binding.Min != nil && numeric < *binding.Min {
+		return fmt.Errorf("fact %q declares the default %v, which is below its own minimum %v", binding.Name, numeric, *binding.Min)
+	}
+	if binding.Max != nil && numeric > *binding.Max {
+		return fmt.Errorf("fact %q declares the default %v, which is above its own maximum %v", binding.Name, numeric, *binding.Max)
+	}
 	return nil
 }
 
@@ -272,6 +313,16 @@ func coerceFactValue(binding factBinding, raw any) (any, error) {
 		value, ok := raw.(string)
 		if !ok {
 			return nil, fmt.Errorf("expected a string, got %v", raw)
+		}
+		// The generated reader trims every metadata value and treats a blank
+		// one as absent, so a literal with surrounding space or an empty
+		// literal can never match. Accepting it would compile a rule that is
+		// dead by construction.
+		if value == "" {
+			return nil, fmt.Errorf("value is empty, and a blank fact counts as absent")
+		}
+		if strings.TrimSpace(value) != value {
+			return nil, fmt.Errorf("value %q has surrounding whitespace, which the runtime trims, so it could never match", value)
 		}
 		return value, nil
 	}

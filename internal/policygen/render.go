@@ -120,11 +120,22 @@ func writeDefaultConfig(b *bytes.Buffer, policy policySpec) {
 	}
 	fmt.Fprintln(b, "},")
 	fmt.Fprintln(b, "ExecutorFallbacks: map[cervorules.Executor][]cervorules.Executor{")
+	// Fallbacks are keyed by executor, not by route, so two routes naming the
+	// same executor describe one entry. Emitting one per route produced a Go
+	// map literal with a duplicate constant key, which only failed in the
+	// consumer's build. validate has already rejected conflicting lists, so
+	// the first is the whole story.
+	emittedFallbacks := map[string]struct{}{}
 	for _, route := range sortedRoutes(policy.Routes) {
 		if len(route.FallbackExecutors) == 0 {
 			continue
 		}
-		fmt.Fprintf(b, "cervorules.Executor(%q): {", normalize(route.Executor))
+		executor := normalize(route.Executor)
+		if _, ok := emittedFallbacks[executor]; ok {
+			continue
+		}
+		emittedFallbacks[executor] = struct{}{}
+		fmt.Fprintf(b, "cervorules.Executor(%q): {", executor)
 		for _, fallback := range route.FallbackExecutors {
 			fmt.Fprintf(b, "cervorules.Executor(%q),", normalize(fallback))
 		}

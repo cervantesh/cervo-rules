@@ -57,8 +57,40 @@ All notable changes to CervoRules will be documented in this file.
   to the operation. It previously carried `reason`, which falls back to the
   literal `"route matched"` — a name that identifies nothing.
 
+### Security
+
+- Fixed a code-injection path in the generator. A predicate description embeds
+  the policy's own string literals and was written into a Go line comment
+  unescaped, so a string-fact literal containing a newline terminated the
+  comment and everything after it was parsed as top-level Go. A policy could
+  inject arbitrary declarations — including a `func init()` that runs on package
+  import — into the generated engine; `check` reported the policy ok, `generate`
+  exited 0, and gofmt accepted the result because the injected text was valid
+  Go. The YAML is the artifact a reviewer reads, so this inverted the review
+  boundary the DSL exists to create. Comments are now sanitised, and the
+  benign form of the same bug — a literal newline making generation fail with
+  an opaque Go parser error — is gone with it.
+
 ### Fixed
 
+- Fixed a fact `default` outside its own declared `min`/`max` being accepted.
+  The generated parser returns the default before it reaches the bounds checks,
+  so absence yielded exactly the value the same policy refuses when present.
+- Fixed integer fact bounds being carried as `float64` and converted with an
+  unchecked `int64(...)`. A bound at or above 2^63 became `MinInt64`, silently
+  dropping the declared minimum; bounds are now required to be exactly
+  representable.
+- Fixed two routes naming the same executor with `fallback_executors` emitting a
+  Go map literal with a duplicate constant key, which only failed in the
+  consumer's build. Routes that disagree on an executor's fallbacks are now
+  rejected at generation time rather than one intent being silently dropped.
+- Fixed `generate -test-out` being nondeterministic: generated test metadata was
+  emitted in Go map-iteration order, so a checked-in generated test churned on
+  every regeneration.
+- Fixed a string-fact literal with surrounding whitespace, or an empty one,
+  compiling to a rule that could never match. The runtime trims every metadata
+  value and treats a blank one as absent, so such a literal is dead by
+  construction and is now rejected.
 - Fixed `generate -test-out` emitting a test file that did not compile for any
   policy with no `tests:` block: the engine variable and the `core` import were
   emitted unconditionally but only referenced by generated cases.

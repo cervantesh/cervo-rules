@@ -3,6 +3,7 @@ package policygen
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -94,9 +95,17 @@ func writeGeneratedTestCase(b *bytes.Buffer, index int, test testSpec) {
 	}
 	fmt.Fprintf(b, "Operation: cervorules.Operation(%q),\n", normalize(test.Request.Operation))
 	if len(test.Request.Metadata) > 0 {
+		// Sorted, not map order: the generated test file is checked in by
+		// consumers, and ranging a Go map made every regeneration produce a
+		// different byte sequence for the same inputs.
+		keys := make([]string, 0, len(test.Request.Metadata))
+		for key := range test.Request.Metadata {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
 		fmt.Fprintln(b, "Metadata: map[string]string{")
-		for key, value := range test.Request.Metadata {
-			fmt.Fprintf(b, "%q: %q,\n", key, value)
+		for _, key := range keys {
+			fmt.Fprintf(b, "%q: %q,\n", key, test.Request.Metadata[key])
 		}
 		fmt.Fprintln(b, "},")
 	}

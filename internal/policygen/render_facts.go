@@ -269,7 +269,7 @@ func writeFactFrame(b *bytes.Buffer, model renderModel) {
 
 func writeMatchers(b *bytes.Buffer, model renderModel) {
 	for _, matcher := range model.matchers {
-		fmt.Fprintf(b, "// %s\n", matcher.comment)
+		fmt.Fprintf(b, "// %s\n", commentSafe(matcher.comment))
 		fmt.Fprintf(b, "func %s(ctx context.Context, e generatedEngine, req cervorules.Request, f factFrame) (bool, string, error) {\n", matcher.name)
 		fmt.Fprint(b, matcher.body)
 		fmt.Fprintln(b, "}")
@@ -503,6 +503,35 @@ func writeFactHelpers(b *bytes.Buffer, bindings []factBinding) {
 		fmt.Fprintln(b, "}")
 		fmt.Fprintln(b)
 	}
+}
+
+// commentSafe makes author-controlled text safe to put in a Go line comment.
+//
+// A predicate description embeds the policy's own string literals. A literal
+// containing a newline used to terminate the comment, so everything after it
+// was parsed as top-level Go: a policy could inject arbitrary declarations —
+// including a func init() that runs on package import — into the generated
+// engine. `check` reported the policy ok, `generate` exited 0, and gofmt
+// accepted the result, because the injected text was valid Go.
+//
+// That inverts what the DSL is for. The YAML is the artifact a reviewer reads;
+// the generated Go is what ships.
+func commentSafe(text string) string {
+	var b strings.Builder
+	b.Grow(len(text))
+	for _, r := range text {
+		switch {
+		case r == '\n' || r == '\r' || r == '\t':
+			b.WriteRune(' ')
+		case r < 0x20 || r == 0x7f:
+			// Other control characters have no business in a comment and can
+			// hide text from a reader of the generated file.
+			continue
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return strings.TrimSpace(b.String())
 }
 
 // exportIdent turns a rule id into a Go identifier fragment.

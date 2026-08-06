@@ -636,6 +636,16 @@ func TestPredicateAuthoringErrorsFailGeneration(t *testing.T) {
 			`when: { condition: never_declared }`,
 			`requires undeclared condition "never_declared"`,
 		},
+		// The runtime trims every metadata value and treats a blank one as
+		// absent, so these compile to rules that are dead by construction.
+		"string literal with surrounding whitespace": {
+			"when: { fact: style, op: eq, value: \" intraday \" }",
+			"could never match",
+		},
+		"empty string literal": {
+			`when: { fact: style, op: eq, value: "" }`,
+			"blank fact counts as absent",
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -737,6 +747,27 @@ func TestFactDeclarationErrorsFailGeneration(t *testing.T) {
 			"version: cervorules.policy.v3\nname: bad.v3\n",
 			"is not a valid identifier",
 		},
+		// The generated parser returns the default before it reaches the
+		// bounds checks, so a default outside them is the one value the policy
+		// accepts while declaring it invalid.
+		"default below its own minimum": {
+			predicateVocab,
+			"version: cervorules.policy.v3\nname: bad.v3\nfacts:\n  risk_pct: { min: 1, default: 0 }\n",
+			"below its own minimum",
+		},
+		"default above its own maximum": {
+			predicateVocab,
+			"version: cervorules.policy.v3\nname: bad.v3\nfacts:\n  risk_pct: { max: 10, default: 99 }\n",
+			"above its own maximum",
+		},
+		// Bounds are decoded as float64 and converted with int64(...). Beyond
+		// 2^53 that conversion cannot round-trip, and beyond 2^63 Go's result
+		// is implementation-defined: the bound silently became MinInt64.
+		"integer bound too large to represent exactly": {
+			predicateVocab,
+			"version: cervorules.policy.v3\nname: bad.v3\nfacts:\n  orders_last_hour: { max: 1e19 }\n",
+			"too large to represent exactly",
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -813,6 +844,178 @@ func TestRouteStepIsNamedWithoutAnAuthoredID(t *testing.T) {
 	}
 }
 `)
+}
+
+// A predicate description embeds the policy's own string literals, and it is
+// written into a Go line comment. A literal containing a newline used to
+// terminate that comment, so everything after it became top-level Go: a policy
+// could inject arbitrary declarations — a func init() runs on package import —
+// into the generated engine. check reported ok, generate exited 0, and gofmt
+// accepted the result, because the injected text was valid Go.
+//
+// The YAML is what a reviewer reads. The generated Go is what ships.
+func TestPolicyTextCannotEscapeIntoGeneratedCode(t *testing.T) {
+	policy := "version: cervorules.policy.v3\n" +
+		"name: injection.v3\n" +
+		"defaults:\n  executor: manual\n" +
+		"denies:\n" +
+		"  - id: deny-inject\n" +
+		"    operation: trade.place\n" +
+		"    when:\n" +
+		"      fact: style\n" +
+		"      op: eq\n" +
+		// No leading or trailing whitespace, so this reaches the renderer
+		// rather than being caught by the dead-literal check.
+		"      value: \"x\\nfunc PolicyInjectedBackdoor() string { return \\\"pwned\\\" }\\n//end\"\n" +
+		"routes:\n" +
+		"  - id: allow-trade\n    operation: trade.place\n    target: desk\n    executor: manual\n"
+
+	out, err := generatePredicatePolicy(t, predicateVocab, policy)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	// Substring presence is expected and harmless: the literal appears inside
+	// correctly escaped Go strings. What must not exist is a declaration, so
+	// check for it at the start of a line.
+	for i, line := range strings.Split(out.Source, "\n") {
+		if strings.HasPrefix(line, "func PolicyInjectedBackdoor") {
+			t.Fatalf("line %d: policy text reached generated code as a top-level declaration:\n%s", i+1, out.Source)
+		}
+		if strings.HasPrefix(strings.TrimSpace(line), "//") && strings.ContainsAny(line, "\r\x00") {
+			t.Fatalf("line %d: comment carries a control character: %q", i+1, line)
+		}
+	}
+	// It must still compile, and the comparison itself must keep the literal
+	// intact — only the comment is sanitised.
+	if !strings.Contains(out.Source, `f.factStyle == "x\nfunc PolicyInjectedBackdoor() string { return \"pwned\" }\n//end"`) {
+		t.Fatalf("the comparison must keep the authored literal:\n%s", out.Source)
+	}
+	compileGeneratedPolicyWithVocab(t, predicateVocabGo, out.Source, minimalTestSource)
+}
+
+// Two routes naming the same executor describe one fallback entry. Emitting one
+// per route produced a Go map literal with a duplicate constant key, which only
+// failed in the consumer's build.
+func TestRoutesSharingAnExecutorEmitOneFallbackEntry(t *testing.T) {
+	policy := `
+version: cervorules.policy.v3
+name: shared.v3
+defaults:
+  executor: manual
+routes:
+  - id: r1
+    operation: trade.place
+    target: desk
+    executor: manual
+    fallback_executors: [standby]
+  - id: r2
+    operation: trade.close
+    target: desk
+    executor: manual
+    fallback_executors: [standby]
+`
+	out, err := generatePredicatePolicy(t, fallbackVocab, policy)
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if got := strings.Count(out.Source, `cervorules.Executor("manual"): {`); got != 1 {
+		t.Fatalf("expected one fallback entry for the shared executor, got %d:\n%s", got, out.Source)
+	}
+	compileGeneratedPolicyWithVocab(t, fallbackVocabGo, out.Source, minimalTestSource)
+
+	// Disagreeing is not a merge to guess at: one authored intent would be lost.
+	conflicting := strings.Replace(policy, "  - id: r2\n    operation: trade.close\n    target: desk\n    executor: manual\n    fallback_executors: [standby]",
+		"  - id: r2\n    operation: trade.close\n    target: desk\n    executor: manual\n    fallback_executors: []", 1)
+	conflicting = strings.Replace(conflicting, "fallback_executors: []", "fallback_executors: [manual]", 1)
+	if _, err := generatePredicatePolicy(t, fallbackVocab, conflicting); err == nil {
+		t.Fatal("conflicting fallback lists for one executor must fail generation")
+	} else if !strings.Contains(err.Error(), "different fallback_executors") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+const fallbackVocab = `
+operations:
+  trade.place: {}
+  trade.close: {}
+targets:
+  desk: {}
+executors:
+  manual: {}
+  standby: {}
+`
+
+const fallbackVocabGo = `package policyvocab
+
+import "github.com/cervantesh/cervo-rules/v3/core"
+
+const (
+	OperationTradePlace core.Operation = "trade.place"
+	OperationTradeClose core.Operation = "trade.close"
+	TargetDesk          core.Target    = "desk"
+	ExecutorManual      core.Executor  = "manual"
+	ExecutorStandby     core.Executor  = "standby"
+)
+
+func Vocabulary() core.Vocabulary {
+	return core.NewVocabulary(
+		core.AllowedOperations(OperationTradePlace, OperationTradeClose),
+		core.AllowedTargets(TargetDesk),
+		core.AllowedExecutors(ExecutorManual, ExecutorStandby),
+	)
+}
+`
+
+// The generated test file is checked in by consumers, so it has to be a
+// function of its inputs and nothing else.
+func TestGeneratedTestsAreByteStable(t *testing.T) {
+	policy := `
+version: cervorules.policy.v3
+name: stable.v3
+defaults:
+  executor: manual
+routes:
+  - id: allow-trade
+    operation: trade.place
+    target: desk
+    executor: manual
+tests:
+  - name: many metadata keys
+    request:
+      operation: trade.place
+      metadata:
+        account_mode: demo
+        risk_pct: "1.0"
+        exposure_pct: "2.0"
+        score: "72"
+        min_score: "50"
+        operable: "true"
+        orders_last_hour: "1"
+        style: intraday
+    expect:
+      allow: true
+`
+	first := ""
+	for i := 0; i < 8; i++ {
+		out, err := Generate(Options{
+			PackageName:       "policyrules",
+			VocabularyPackage: "policyvocab",
+			VocabularyImport:  "example.test/generated/policyvocab",
+			VocabularyReader:  strings.NewReader(predicateVocab),
+			PolicyReader:      strings.NewReader(policy),
+			GeneratedTests:    true,
+		})
+		if err != nil {
+			t.Fatalf("generate: %v", err)
+		}
+		if i == 0 {
+			first = out.TestSource
+			continue
+		}
+		if out.TestSource != first {
+			t.Fatalf("generated test source is not stable across runs:\n--- run 1 ---\n%s\n--- run %d ---\n%s", first, i+1, out.TestSource)
+		}
+	}
 }
 
 // A policy that declares no predicates must not pay for the machinery.

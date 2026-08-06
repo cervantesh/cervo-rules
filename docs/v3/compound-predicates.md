@@ -142,16 +142,16 @@ facts:
     type: enum
     values: [demo, live]
     description: Whether the account is a demo or a funded account.
-    go_name: FactAccountMode
+    go_name: AccountMode
   risk_pct:
     type: number
-    go_name: FactRiskPct
+    go_name: RiskPct
   operable:
     type: bool
-    go_name: FactOperable
+    go_name: Operable
   orders_last_hour:
     type: integer
-    go_name: FactOrdersLastHour
+    go_name: OrdersLastHour
 ```
 
 `type` is one of `number | integer | bool | enum | string`. `values` is
@@ -354,16 +354,16 @@ ALLOW.
 
 ```yaml
 facts:
-  account_mode:     { type: enum, values: [demo, live], go_name: FactAccountMode }
-  risk_pct:         { type: number,  go_name: FactRiskPct }
-  exposure_pct:     { type: number,  go_name: FactExposurePct }
-  daily_loss_pct:   { type: number,  go_name: FactDailyLossPct }
-  score:            { type: number,  go_name: FactScore }
-  min_score:        { type: number,  go_name: FactMinScore }
-  operable:         { type: bool,    go_name: FactOperable }
-  event_window:     { type: bool,    go_name: FactEventWindow }
-  orders_last_hour: { type: integer, go_name: FactOrdersLastHour }
-  killswitch:       { type: bool,    go_name: FactKillswitch }
+  account_mode:     { type: enum, values: [demo, live], go_name: AccountMode }
+  risk_pct:         { type: number,  go_name: RiskPct }
+  exposure_pct:     { type: number,  go_name: ExposurePct }
+  daily_loss_pct:   { type: number,  go_name: DailyLossPct }
+  score:            { type: number,  go_name: Score }
+  min_score:        { type: number,  go_name: MinScore }
+  operable:         { type: bool,    go_name: Operable }
+  event_window:     { type: bool,    go_name: EventWindow }
+  orders_last_hour: { type: integer, go_name: OrdersLastHour }
+  killswitch:       { type: bool,    go_name: Killswitch }
 ```
 
 `killswitch` is a fact here, but `gate.Facts` still has no killswitch field — the
