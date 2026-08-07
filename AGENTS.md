@@ -166,7 +166,11 @@ Two of those recipes are currently broken; see `docs/v3/known-gaps.md`.
 
 ## Agnosticism Rules
 
-- Keep domain vocabulary in the consuming project.
+- Keep domain vocabulary in the consuming project. This one is enforced:
+  `TestLibrarySourceHardcodesNoDomainVocabulary` fails the build if a name
+  declared in any example vocabulary appears as a string literal in
+  hand-written library source. Generated code is exempt, because carrying the
+  vocabulary is its job.
 - Keep transport parsing outside `core`.
 - Keep HTTP-specific code in `httpadapter`.
 - Keep model/profile selection outside CervoRules.
