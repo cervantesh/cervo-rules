@@ -13,4 +13,5 @@ release-candidate evidence.
 | [Migration v2 to v3](migration-v2-to-v3.md) | Before/after guidance for consumers moving to v3. |
 | [Generated policy factory](generated-policy-factory.md) | Canonical generated runtime entrypoint. |
 | [Facts engine](facts-engine.md) | Optional logic engine contracts and operational budgets. |
+| [Known gaps](known-gaps.md) | Verified, unfixed defects, each with how it was checked. |
 | [Release notes](release-notes.md) | v3 release-candidate notes. |
