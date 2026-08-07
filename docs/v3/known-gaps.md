@@ -5,7 +5,7 @@ reader can confirm it still holds instead of trusting this file.
 
 There are none open right now.
 
-Last verified against `7e53044` on 2026-08-07, the rc.7 release commit. All
+Last verified at `v3.0.0-rc.7` on 2026-08-07. All
 seven entries opened during the rc.5/rc.6 work were fixed the same day:
 
 - the conformance recipe pointing at a test name nothing matches;
