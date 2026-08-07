@@ -2,6 +2,77 @@
 
 All notable changes to CervoRules will be documented in this file.
 
+## v3.0.0-rc.7 - 2026-08-07
+
+### Removed
+
+- Retired three published schemas that no tool produced and no document
+  satisfied: `schemas/v3/policy-inspection.schema.json`,
+  `schemas/v3/compatibility-report.schema.json`, and
+  `schemas/v3/agent-manifest.schema.json`. The first two described the output of
+  CLI commands that were never built. The third was a rival shape for the agent
+  manifest; every reference in the repository resolves to
+  `.cervorules/agent-manifest.json`, which validates against the schema beside
+  it and never matched the v3 one. Consumers extracting
+  `cervorules-schemas-<version>.tar.gz` will no longer find these three. They
+  remain in git history if the commands are ever built.
+
+### Fixed
+
+- `ontology`: an individual recorded in two lifecycle states let a second
+  terminal transition through, and which one won depended on input order.
+  Recording `paid` first permitted a refund that recording `refunded` first
+  refused. `CheckTransition` now rejects the incoherent world before reading
+  state, so `transition_allowed` alone is safe.
+- `ontology`: two relations declaring the same `PredicateSignature` were
+  accepted, after which `Check` took the last and `domainOf` took the first.
+  `Validate` now rejects the duplicate.
+- `ontology`: `Normalize` sorted states by a partial key, so equivalent
+  ontologies could normalize to different orders.
+- `httpadapter`: a classifier rule whose regex contained an uppercase letter
+  could never fire, because the input was lowercased and the pattern was not.
+- `decisioncache` was published and empty while the API inventory recorded it as
+  owning contracts.
+
+### Changed
+
+- The public API inventory now covers all ten packages, not four.
+
+### Added
+
+Claims this project makes in prose are now checked by the build. Each check was
+verified against a mutant before being committed, because a check that cannot
+fail is the defect these are meant to catch, and this repository has found
+three of those.
+
+- Fail-closed is fuzzed. `internal/fuzzpolicy` commits a generated engine as a
+  subject; the assertion is that if a decision came back, every fact the policy
+  read was parseable and in range. 73.7M executions with no failure.
+- Generation is pinned byte-stable across runs, because Go randomizes map order
+  per process and the `PolicyHash` argument rests on generation being a function
+  of its inputs.
+- The standard-library-only boundary is checked against the build graph with
+  `go list -deps`, so an indirect dependency cannot hide from a source scan.
+- The agnosticism rule is enforced: no name declared in any example vocabulary
+  may appear as a string literal in hand-written library source. Generated code
+  is exempt, because carrying the vocabulary is its job.
+- No schema may be published without a producer. `validate-schemas.py` requires
+  every schema to be backed by documents in the repository or by a named Go
+  test holding its producer to it, and checks that the named test exists.
+- `.cervorules` JSON is validated in CI alongside the policy YAML. The agent
+  manifest had never validated against either of its rival schemas.
+- `observe.PolicyEvaluationReport` is held to
+  `schemas/v3/policy-evaluation-report.schema.json`; the schema sets
+  `additionalProperties: false`, so a new struct field would have broken every
+  consumer validating against it.
+- Task recipes are checked for what they claim, not only for their shape: every
+  `-run` pattern must select a real test, every script and CLI subcommand must
+  exist, every flag must be declared, and a pinned version must match
+  `current_version` in the manifest.
+- Error-code wire strings are pinned, and every code must be documented.
+- `CodegenSnapshot` gained `policy_facts` and `predicates`, so a changed fact
+  bound or an added `when:` moves a snapshot field.
+
 ## v3.0.0-rc.6 - 2026-08-06
 
 ### Security

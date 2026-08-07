@@ -1,6 +1,6 @@
 # CervoRules Agent Guide
 
-Current release candidate: `v3.0.0-rc.6`.
+Current release candidate: `v3.0.0-rc.7`.
 
 Primary module: `github.com/cervantesh/cervo-rules/v3`.
 

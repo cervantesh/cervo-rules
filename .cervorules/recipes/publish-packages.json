@@ -4,7 +4,7 @@
   "goal": "Verify release artifacts and package registry contents for a tag.",
   "when_to_use": "Use after creating a release tag or when validating a package smoke release.",
   "inputs": [
-    "release tag such as v3.0.0-rc.6",
+    "release tag such as v3.0.0-rc.7",
     "package registry credentials"
   ],
   "outputs": [
@@ -13,8 +13,8 @@
     "checksums verification"
   ],
   "commands": [
-    "bash scripts/release/verify-github-release.sh v3.0.0-rc.6",
-    "bash scripts/release/verify-oci-tools.sh v3.0.0-rc.6"
+    "bash scripts/release/verify-github-release.sh v3.0.0-rc.7",
+    "bash scripts/release/verify-oci-tools.sh v3.0.0-rc.7"
   ],
   "checks": [
     "go test -count=1 ./...",
@@ -23,6 +23,6 @@
   ],
   "failure_mode": "Fail the release if expected binaries, schemas, checksums, metadata, or CLI versions are missing.",
   "notes": [
-    "Use the actual tag instead of v3.0.0-rc.6 for future releases."
+    "Use the actual tag instead of v3.0.0-rc.7 for future releases."
   ]
 }

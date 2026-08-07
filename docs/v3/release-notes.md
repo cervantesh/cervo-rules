@@ -3,6 +3,48 @@
 Notes for the current release candidate, followed by the ones it supersedes.
 Every entry here remains a release candidate, not GA final.
 
+## v3.0.0-rc.7
+
+No new DSL surface. This release turns claims into checks.
+
+The rc.5 and rc.6 work kept finding the same shape of defect: a document
+asserting something true, a check that could not fail, a contract published
+with no producer. Reading validated that each was *plausible*. Running showed
+whether it *corresponded*. rc.7 applies that lens to the claims themselves, so
+the build refuses what a reader would have to take on trust.
+
+Every check added here was verified against a mutant before being committed. A
+guard that cannot fail is exactly the defect being hunted, and three of those
+had already shipped.
+
+**What is now enforced.** Fail-closed is fuzzed rather than argued — 73.7M
+executions against a committed generated engine, asserting that a decision
+implies every fact it read was usable. Generation is byte-stable across runs.
+The standard-library-only boundary is read from the build graph, so an indirect
+dependency cannot hide. The agnosticism rule is mechanical: no vocabulary name
+from any example may appear as a literal in hand-written library source. No
+schema may be published without a producer. Task recipes are checked for what
+they claim, not only for their shape.
+
+**What changed for consumers.** Three schemas were retired from the release
+archive: `policy-inspection`, `compatibility-report`, and the `schemas/v3` copy
+of `agent-manifest`. None had a producer; the first two described commands that
+were never built. If you extract `cervorules-schemas-<version>.tar.gz` and read
+those files, they are gone. The agent manifest schema now lives only at
+`.cervorules/schemas/agent-manifest.schema.json`, next to the manifest it
+describes.
+
+**Behaviour fixes.** `ontology` accepted an individual in two lifecycle states,
+which let a second terminal transition through and made the outcome depend on
+input order — recording `paid` first permitted a refund that recording
+`refunded` first refused. It also accepted two relations with the same
+predicate signature, after which `Check` took one and `domainOf` took the
+other. `httpadapter` lowercased its input but not the rule's regex, so any
+pattern containing an uppercase letter could never fire.
+
+Upgrading from rc.6 needs no policy or code change unless you read one of the
+three retired schemas.
+
 ## v3.0.0-rc.6
 
 A toolchain security bump on top of rc.5. No library behaviour changes.
@@ -163,6 +205,6 @@ powershell -ExecutionPolicy Bypass -File scripts/release/check.ps1 v3.0.0-rc.6 d
 ## Verification After Package Publish
 
 ```bash
-scripts/release/verify-github-release.sh v3.0.0-rc.6
-scripts/release/verify-oci-tools.sh v3.0.0-rc.6
+scripts/release/verify-github-release.sh v3.0.0-rc.7
+scripts/release/verify-oci-tools.sh v3.0.0-rc.7
 ```

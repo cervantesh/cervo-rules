@@ -5,8 +5,8 @@ reader can confirm it still holds instead of trusting this file.
 
 There are none open right now.
 
-Last verified against `32b7d0b` on 2026-08-06. All seven entries opened during
-the rc.5/rc.6 work were fixed the same day:
+Last verified against `7e53044` on 2026-08-07, the rc.7 release commit. All
+seven entries opened during the rc.5/rc.6 work were fixed the same day:
 
 - the conformance recipe pointing at a test name nothing matches;
 - `repo-hygiene.sh` being invoked by no workflow and no script;

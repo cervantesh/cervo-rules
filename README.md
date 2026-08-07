@@ -5,7 +5,7 @@ CervoRules is an independent Go library for deterministic policy decisions.
 It is a decision engine, not a proxy, scheduler, model selector, transport
 parser, logger, metrics backend, or data plane.
 
-The current breaking-line release candidate is `v3.0.0-rc.6`. New projects
+The current breaking-line release candidate is `v3.0.0-rc.7`. New projects
 should evaluate the v3 module path:
 
 ```go

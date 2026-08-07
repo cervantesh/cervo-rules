@@ -3,7 +3,7 @@
 This guide is the copyable workflow for AI agents and automation working on
 CervoRules consumers or examples.
 
-Current version: `v3.0.0-rc.6`.
+Current version: `v3.0.0-rc.7`.
 
 The active repository is v3-root and ships v3-native generator commands.
 
@@ -100,13 +100,13 @@ available.
 Verify the published GitHub Release:
 
 ```powershell
-bash scripts/release/verify-github-release.sh v3.0.0-rc.6
+bash scripts/release/verify-github-release.sh v3.0.0-rc.7
 ```
 
 Verify the OCI image when enabled:
 
 ```powershell
-bash scripts/release/verify-oci-tools.sh v3.0.0-rc.6
+bash scripts/release/verify-oci-tools.sh v3.0.0-rc.7
 ```
 
 OCI verification checks schema files plus `cervorules-policygen -version` and

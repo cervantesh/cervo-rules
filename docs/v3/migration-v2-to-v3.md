@@ -9,7 +9,7 @@ for machines to inspect.
 ## Status
 
 - v2 final split release: `v2.1.0`.
-- v3 current release candidate: `v3.0.0-rc.6`.
+- v3 current release candidate: `v3.0.0-rc.7`.
 - v3 module path: `github.com/cervantesh/cervo-rules/v3`.
 - v3 is repo-ready for RC package verification, but not GA final.
 
@@ -169,7 +169,7 @@ For v3 release candidates, release packages must include:
 Verification commands:
 
 ```bash
-scripts/release/check.sh v3.0.0-rc.6 dist-release-check-v3.0.0-rc.6
-scripts/release/verify-github-release.sh v3.0.0-rc.6
-scripts/release/verify-oci-tools.sh v3.0.0-rc.6
+scripts/release/check.sh v3.0.0-rc.7 dist-release-check-v3.0.0-rc.7
+scripts/release/verify-github-release.sh v3.0.0-rc.7
+scripts/release/verify-oci-tools.sh v3.0.0-rc.7
 ```
