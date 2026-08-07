@@ -162,7 +162,13 @@ the `v3/` prefix describes the legacy `cervorules.policy.v1` DSL and is kept for
 migration only.
 
 Agent tooling: `.cervorules/schemas/*.json` and `.cervorules/recipes/*.json`.
-Two of those recipes are currently broken; see `docs/v3/known-gaps.md`.
+Both are checked by CI. The schemas are validated against the documents they
+cover, and no schema may be published without one. A recipe is checked for what
+it claims, not only for its shape: every `-run` pattern must select a real
+test, every script and CLI subcommand must exist, every flag must be declared,
+and a pinned version must match `current_version` in the manifest. Follow a
+recipe as written — if it names something that does not exist, that is a bug in
+this repository, not in your reading of it.
 
 ## Agnosticism Rules
 
