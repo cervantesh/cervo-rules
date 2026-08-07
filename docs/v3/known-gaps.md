@@ -5,6 +5,30 @@ reader can confirm it still holds instead of trusting this file.
 
 ## Open
 
+**A fact's declared bounds are not enforced unless a rule reads it.** A policy
+that writes `some_fact: { min: 0, max: 100 }` under `facts:` has stated a
+constraint that looks like validation. It is not one. The generator emits a
+parser only for the facts some predicate mentions, so a fact declared with
+bounds and read by no rule is never parsed: a request carrying `some_fact=999`,
+or `NaN`, or nonsense, is decided as though the key were absent.
+
+How it was found: `TestMetamorphicProperties` compared a policy against the
+same policy plus one rule that cannot hold. The two disagreed — one returned
+`invalid_fact` where the other returned `missing_fact` — because the added rule
+mentioned a fact no other rule read, and that alone made the fact required.
+Confirmed directly: generating a policy with a declared-but-unreferenced fact
+emits no mention of it in the engine at all.
+
+Two consequences worth stating separately. An author reading the policy file
+will believe a bound is checked when it is not. And adding a deny that
+references a previously unread fact is not the additive change it looks like:
+requests that used to be decided start failing with `missing_fact` at runtime.
+
+Fixing it means choosing what `facts:` means — a declaration of what the policy
+is about, or only a place to park thresholds for rules to use. That is a DSL
+decision, so it is recorded rather than made here. Until then, a bound is only
+real if some rule reads the fact.
+
 **`PolicyHash` depends on the checkout's line endings.** The hash is sha256
 over the policy file's raw bytes, so a checkout that converts `\n` to `\r\n`
 changes a policy's identity without changing the policy. The same file in this
