@@ -3,59 +3,34 @@
 Verified, unfixed defects. Each entry records how it was checked so a later
 reader can confirm it still holds instead of trusting this file.
 
-Last verified against `28bbebe` on 2026-08-06. Five entries were fixed the same
-day and removed: the conformance recipe pointing at a nonexistent test,
-`repo-hygiene.sh` being invoked by nothing, `check -format json` writing to
-stderr, the unpinned error-code wire strings, and the public API inventory
-listing four of ten packages. The last two are now enforced by tests rather
-than by documents.
+There are none open right now.
+
+Last verified against `32b7d0b` on 2026-08-06. All seven entries opened during
+the rc.5/rc.6 work were fixed the same day:
+
+- the conformance recipe pointing at a test name nothing matches;
+- `repo-hygiene.sh` being invoked by no workflow and no script;
+- `check -format json` writing its result to stderr;
+- the unpinned error-code wire strings;
+- the public API inventory listing four of ten packages;
+- no snapshot field responding to a policy's facts or predicates;
+- `generated-policy-metadata.schema.json` describing a document nothing
+  produced.
+
+The last four are now enforced by tests rather than by documents, which is the
+only reason to expect them to stay fixed.
+
+One entry was recorded with a wrong reason and is worth naming: the snapshot
+gap said `Facts` was inconsistent because "every sibling counts the policy".
+That is false — `Operations`, `Targets` and `Executors` count the vocabulary
+too, so `Facts` was consistent with its siblings. The real defect was narrower:
+no field moved when a policy's `facts:` bounds changed or a `when:` was added.
+It was fixed by adding `policy_facts` and `predicates`, not by changing what
+`facts` means.
 
 This is a living list of open items. It is not a review record: the rc.1 review
 is in [post-rc-review.md](post-rc-review.md), and per-change decisions live in
 `docs/change-management/`.
-
-## Machine-readable output that no machine can read
-
-**`CodegenSnapshot.Facts` counts the vocabulary while every sibling counts the
-policy.** `generator.go:559` sets `Facts: len(vocab.spec.Facts)`, so retuning a
-policy's `facts:` bounds, or adding a `when:` predicate, leaves every count in
-the snapshot byte-identical. Only `policy_hash` moves. No field counts
-predicates at all.
-
-Fix: count the facts the policy references (`policyPlan.referenced`), and
-consider adding a predicate count.
-
-## Contracts that contradict the code
-
-**`schemas/v3/generated-policy-metadata.schema.json` describes a document
-nothing produces.** It requires a `schema_version` field and `^sha256:`-prefixed
-hashes. `runtime.PolicyMetadata` has no `schema_version`, the generator emits
-bare hex, and nothing in the repository writes such a document.
-
-```bash
-grep -n "schema_version\|sha256:" schemas/v3/generated-policy-metadata.schema.json
-grep -rn "generated-policy-metadata" --include="*.go" .    # no producer
-```
-
-Fix: either produce the document, or delete the schema. A published contract
-for an artifact that does not exist is worse than no contract.
-
-**`.cervorules/agent-manifest.json` violates its own schema.** The manifest
-carries keys that `.cervorules/schemas/agent-manifest.schema.json` rejects under
-`additionalProperties: false` — `legacy_commands_repository`, `legacy_v1_schemas`
-and others. There is also a second, competing schema at
-`schemas/v3/agent-manifest.schema.json` with no stated arbiter.
-
-```python
-import json
-from jsonschema import Draft202012Validator
-d = json.load(open('.cervorules/agent-manifest.json'))
-s = json.load(open('.cervorules/schemas/agent-manifest.schema.json'))
-list(Draft202012Validator(s).iter_errors(d))   # 1 error
-```
-
-Fix: extend the schema to the keys the manifest actually uses, and pick which of
-the two schemas is authoritative.
 
 ## Deliberately out of scope
 

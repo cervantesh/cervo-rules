@@ -95,8 +95,9 @@ func runCheck(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "unsupported -format %q\n", *format)
 		return 2
 	}
-	fmt.Fprintf(stderr, "ok policy=%s routes=%d denies=%d conditions=%d facts=%d tests=%d\n",
-		out.Metadata.Name, out.Snapshot.Routes, out.Snapshot.Denies, out.Snapshot.Conditions, out.Snapshot.Facts, out.Snapshot.Tests)
+	fmt.Fprintf(stderr, "ok policy=%s routes=%d denies=%d predicates=%d conditions=%d facts=%d policy_facts=%d tests=%d\n",
+		out.Metadata.Name, out.Snapshot.Routes, out.Snapshot.Denies, out.Snapshot.Predicates,
+		out.Snapshot.Conditions, out.Snapshot.Facts, out.Snapshot.PolicyFacts, out.Snapshot.Tests)
 	return 0
 }
 
@@ -111,6 +112,7 @@ func runGenerate(args []string, stderr io.Writer) int {
 	vocabPackage := flags.String("vocab-package", "", "vocabulary package alias")
 	vocabImport := flags.String("vocab-import", "", "vocabulary package import path")
 	cervoImport := flags.String("cervorules-import", "github.com/cervantesh/cervo-rules/v3", "cervo-rules v3 module import path")
+	metadataOutPath := flags.String("metadata-out", "", "generated policy metadata JSON, matching schemas/v3/generated-policy-metadata.schema.json")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -147,7 +149,37 @@ func runGenerate(args []string, stderr io.Writer) int {
 			return 1
 		}
 	}
+	if *metadataOutPath != "" {
+		document, err := json.MarshalIndent(generatedPolicyMetadata(out.Metadata), "", "  ")
+		if err != nil {
+			fmt.Fprintf(stderr, "encode policy metadata: %v\n", err)
+			return 1
+		}
+		if err := os.WriteFile(*metadataOutPath, append(document, '\n'), 0o600); err != nil {
+			fmt.Fprintf(stderr, "write policy metadata: %v\n", err)
+			return 1
+		}
+	}
 	return 0
+}
+
+// generatedPolicyMetadata renders the document described by
+// schemas/v3/generated-policy-metadata.schema.json.
+//
+// The schema was published without a producer, so it described a document that
+// did not exist. The hashes carry an explicit sha256: prefix here while the
+// generated Go embeds them bare: the prefix names the algorithm for a reader of
+// the document, and putting it in PolicyMetadata would be a public API change
+// for no gain.
+func generatedPolicyMetadata(meta policygen.PolicyMetadata) map[string]string {
+	return map[string]string{
+		"schema_version":  "cervorules.v3.generated_policy_metadata.v1",
+		"name":            meta.Name,
+		"dsl_version":     meta.DSLVersion,
+		"generated_with":  meta.GeneratedWith,
+		"vocabulary_hash": "sha256:" + meta.VocabularyHash,
+		"policy_hash":     "sha256:" + meta.PolicyHash,
+	}
 }
 
 func writeCLIError(stderr io.Writer, format string, exitCode int, err core.Error, prefix string) int {

@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/cervantesh/cervo-rules/v3/core"
+	"github.com/cervantesh/cervo-rules/v3/internal/policygen"
 )
 
 func TestRunCheckAndGenerate(t *testing.T) {
@@ -215,5 +217,61 @@ func writeFile(t *testing.T, path string, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+// The metadata schema was published without a producer: it required a
+// schema_version field and sha256:-prefixed hashes that nothing emitted. Now
+// that -metadata-out writes the document, this pins it to the schema's own
+// required keys, consts and patterns, so the contract and the producer cannot
+// drift apart again.
+func TestGeneratedPolicyMetadataMatchesItsSchema(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "schemas", "v3", "generated-policy-metadata.schema.json"))
+	if err != nil {
+		t.Fatalf("read schema: %v", err)
+	}
+	var schema struct {
+		Required   []string `json:"required"`
+		Properties map[string]struct {
+			Const   string `json:"const"`
+			Pattern string `json:"pattern"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		t.Fatalf("schema is not valid JSON: %v", err)
+	}
+
+	document := generatedPolicyMetadata(policygen.PolicyMetadata{
+		Name:           "sample.v3",
+		DSLVersion:     "cervorules.policy.v3",
+		GeneratedWith:  "cervorules-policygen/v3",
+		VocabularyHash: "aa",
+		PolicyHash:     "bb",
+	})
+
+	for _, key := range schema.Required {
+		if document[key] == "" {
+			t.Errorf("required key %q is missing or empty in the produced document", key)
+		}
+	}
+	for key := range document {
+		if _, ok := schema.Properties[key]; !ok {
+			t.Errorf("produced key %q is not allowed by the schema", key)
+		}
+	}
+	for key, rule := range schema.Properties {
+		value := document[key]
+		if rule.Const != "" && value != rule.Const {
+			t.Errorf("%s: got %q want const %q", key, value, rule.Const)
+		}
+		if rule.Pattern != "" {
+			matched, err := regexp.MatchString(rule.Pattern, value)
+			if err != nil {
+				t.Fatalf("%s: bad pattern in schema: %v", key, err)
+			}
+			if !matched {
+				t.Errorf("%s: %q does not match %q", key, value, rule.Pattern)
+			}
+		}
 	}
 }

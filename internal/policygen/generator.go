@@ -61,7 +61,14 @@ type CodegenSnapshot struct {
 	Denies     int    `json:"denies"`
 	Tests      int    `json:"tests"`
 	Conditions int    `json:"conditions"`
-	Facts      int    `json:"facts"`
+
+	// Facts counts the vocabulary, like Operations, Targets and Executors.
+	// PolicyFacts and Predicates count the policy, so a change to a fact's
+	// bounds or a new `when:` moves a number a reader can see. Before they
+	// existed no snapshot field responded to either, and only policy_hash did.
+	Facts       int `json:"facts"`
+	PolicyFacts int `json:"policy_facts"`
+	Predicates  int `json:"predicates"`
 }
 
 type vocabularySpec struct {
@@ -556,8 +563,27 @@ func snapshotFor(policy loadedPolicy, vocab loadedVocabulary) CodegenSnapshot {
 		Denies:     len(policy.spec.Denies),
 		Tests:      len(policy.spec.Tests),
 		Conditions: len(policy.spec.Conditions),
-		Facts:      len(vocab.spec.Facts),
+
+		Facts:       len(vocab.spec.Facts),
+		PolicyFacts: len(policy.spec.Facts),
+		Predicates:  countPredicates(policy.spec),
 	}
+}
+
+// countPredicates counts the rules carrying a `when:`, not the nodes inside it.
+func countPredicates(policy policySpec) int {
+	total := 0
+	for _, route := range policy.Routes {
+		if route.When != nil {
+			total++
+		}
+	}
+	for _, deny := range policy.Denies {
+		if deny.When != nil {
+			total++
+		}
+	}
+	return total
 }
 
 func hash(data []byte) string {
