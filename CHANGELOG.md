@@ -33,6 +33,13 @@ All notable changes to CervoRules will be documented in this file.
   could never fire, because the input was lowercased and the pattern was not.
 - `decisioncache` was published and empty while the API inventory recorded it as
   owning contracts.
+- Added `.gitattributes` pinning this repository to LF. The `PolicyHash` is
+  sha256 over a policy file's raw bytes, so a checkout that converted line
+  endings changed a policy's identity without changing the policy, and
+  generation was not reproducible between a Windows machine and CI. This fixes
+  the repository; the same hazard for consumers is recorded as an open gap in
+  `docs/v3/known-gaps.md`, because normalizing inside the hash would invalidate
+  every hash ever recorded.
 
 ### Changed
 

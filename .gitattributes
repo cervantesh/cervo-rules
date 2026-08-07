@@ -1,0 +1,17 @@
+# The PolicyHash is sha256 over a policy file's raw bytes. A checkout that
+# converts line endings therefore changes the identity of a policy without
+# changing the policy, and the generator embeds that hash into the code it
+# emits. Committing this file is what makes a checkout byte-identical on every
+# platform, so generation is reproducible and a hash means the same thing to
+# every operator.
+#
+# This was found by TestFuzzSubjectMatchesGenerator: the committed subject
+# carried a hash of CRLF bytes and CI, checking out LF, computed a different
+# one.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.gz binary
+*.zip binary
+*.exe binary

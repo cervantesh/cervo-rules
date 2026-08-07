@@ -23,8 +23,8 @@ func (PolicyFactory) Metadata() cervoruntime.PolicyMetadata {
 		Name:           "predicate-composition.v3",
 		DSLVersion:     "cervorules.policy.v3",
 		GeneratedWith:  "cervorules-policygen/v3",
-		VocabularyHash: "b27c5f0ff62d4357861bbfb8d9a1526b8fdac3395d7df1a30bfa919eeff0aa4b",
-		PolicyHash:     "6bbdbdfbc60f38e0df6dbcddffcaebe606c10f8a7de91c56504d96cf0488d52c",
+		VocabularyHash: "e876d0163e12818597e76ff42b8690f4b4ec63d72fb43c6bfbdfd4a38315928c",
+		PolicyHash:     "ee8bd24fff7e6c6b9dcb94a35b031c3e326516e6a0b64c7332f7be52552d1404",
 	}
 }
 

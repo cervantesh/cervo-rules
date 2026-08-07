@@ -3,7 +3,36 @@
 Verified, unfixed defects. Each entry records how it was checked so a later
 reader can confirm it still holds instead of trusting this file.
 
-There are none open right now.
+## Open
+
+**`PolicyHash` depends on the checkout's line endings.** The hash is sha256
+over the policy file's raw bytes, so a checkout that converts `\n` to `\r\n`
+changes a policy's identity without changing the policy. The same file in this
+repository hashes to `ee8bd24f…` as git stores it and `6bbdbdfb…` in a Windows
+working tree with `core.autocrlf=true`.
+
+How it was found: `TestFuzzSubjectMatchesGenerator` passed locally and failed in
+CI on the rc.7 tag. The committed fuzz subject carried a hash of CRLF bytes;
+the Linux runner, checking out LF, computed a different one.
+
+What is fixed: `.gitattributes` pins this repository to LF, so generation here
+is reproducible and CI and a developer machine agree.
+
+What is not: a consumer generating a policy on Windows with `autocrlf=true`
+still gets a different `PolicyHash` than their Linux CI does from the same
+committed file. Their "generated code is current" check then fails for a reason
+that has nothing to do with their policy — or worse, someone silences it.
+
+Why it is not simply fixed here: normalizing line endings inside the hash would
+make it platform-stable, but it changes every `PolicyHash` ever recorded, and
+`AGENTS.md` states the hash covers the file's bytes. That is a decision about
+the audit contract, not a bug fix. Until it is made, a consumer should commit a
+`.gitattributes` of their own.
+
+Note that `TestGenerationIsByteStableAcrossRuns` does not cover this: it proves
+generation is stable across runs in one process, not across platforms.
+
+## Closed
 
 Last verified at `v3.0.0-rc.7` on 2026-08-07. All
 seven entries opened during the rc.5/rc.6 work were fixed the same day:
