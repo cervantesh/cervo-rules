@@ -1,4 +1,4 @@
-package policygen
+package moduleguard
 
 import (
 	"encoding/json"
