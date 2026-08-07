@@ -3,3 +3,6 @@ dist-release-check*/
 dist-performance-profiles/
 dist-performance-report/
 *.pprof
+
+# Fuzzing corpus grows locally; the seed corpus lives in the test source.
+internal/fuzzpolicy/testdata/fuzz/
