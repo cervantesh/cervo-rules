@@ -117,10 +117,10 @@ v3 machine-readable schemas live under `schemas/v3`:
 - `policy-rules.schema.json`;
 - `policy-vocabulary.schema.json`;
 - `policy-evaluation-report.schema.json`;
-- `policy-inspection.schema.json`;
-- `compatibility-report.schema.json`;
-- `agent-manifest.schema.json`;
 - `generated-policy-metadata.schema.json`.
+
+The agent manifest schema is `.cervorules/schemas/agent-manifest.schema.json`,
+next to the manifest it describes.
 
 Release artifacts must include these schemas in the GitHub Release and OCI
 tools image.

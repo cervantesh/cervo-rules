@@ -69,6 +69,25 @@
         "core_does_not_own": { "type": "array", "items": { "type": "string" } }
       },
       "additionalProperties": false
+    },
+    "repository_layout": { "type": "string" },
+    "next_major": {
+      "type": "object",
+      "properties": {
+        "target_version": { "type": "string" },
+        "module": { "type": "string" },
+        "migration": { "type": "string" },
+        "api_reference": { "type": "string" },
+        "release_notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "legacy_v2_repository": { "type": "string" },
+    "legacy_commands_repository": { "type": "string" },
+    "legacy_v1_schemas": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
     }
   },
   "additionalProperties": false

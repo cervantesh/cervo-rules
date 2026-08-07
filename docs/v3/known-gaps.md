@@ -36,6 +36,17 @@ is in [post-rc-review.md](post-rc-review.md), and per-change decisions live in
 
 Not gaps. Recorded so nobody reopens them as oversights:
 
+- **`policy-inspection` and `compatibility-report` schemas.** Retired, not
+  deferred. Both described the output of CLI commands that were never built, so
+  each was a published promise that some tool emits this shape when none did.
+  A third, `schemas/v3/agent-manifest.schema.json`, was a rival shape for the
+  manifest: every document and every reference points at
+  `.cervorules/agent-manifest.json`, which validates against the schema beside
+  it and never matched the v3 one. They are in git history if the commands land.
+  The class is now closed rather than the three instances: `validate-schemas.py`
+  fails on any published schema not backed either by documents in the repository
+  or by a named Go test holding its producer to it.
+
 - **v2 `limits` in the DSL.** Not deferred: decided against. `limits.Budget` is
   `MaxTokens`, `AllowStream`, `AllowTools`, `AllowImages`, `MaxBodyBytes` —
   four of five are LLM gateway vocabulary, and `AGENTS.md` forbids adding "AI,

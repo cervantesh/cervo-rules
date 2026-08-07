@@ -5,15 +5,15 @@ Tracks epic #370 and child issues #371, #372, #373, #374, and #375.
 ## Goal
 
 Agents and tooling should inspect v3 capabilities without parsing prose first.
-v3 therefore versions the agent manifest schema, policy inspection JSON,
-generated policy metadata, and public API inventory.
+v3 therefore versions the agent manifest schema, generated policy metadata,
+the policy evaluation report, and the public API inventory.
 
 ## Schemas
 
 Machine-readable v3 schemas:
 
-- `schemas/v3/agent-manifest.schema.json`;
-- `schemas/v3/policy-inspection.schema.json`;
+- `.cervorules/schemas/agent-manifest.schema.json`;
+- `.cervorules/schemas/task-recipe.schema.json`;
 - `schemas/v3/generated-policy-metadata.schema.json`;
 - `schemas/v3/policy-evaluation-report.schema.json`;
 - `schemas/v3/policy-rules.schema.json`;
