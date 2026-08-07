@@ -15,7 +15,7 @@
   ],
   "commands": [
     "go test -run TestConsumerConformance -count=1 ./...",
-    "go test -run TestGeneratedRuntimePolicy -count=1 ./..."
+    "go test -run TestRuntimeCase -count=1 ./..."
   ],
   "checks": [
     "go test -count=1 ./..."

@@ -13,6 +13,10 @@ run go test -cover ./...
 run go vet ./...
 run go mod verify
 
+# The only enforcement of the Operation/Target/Executor naming contract. It was
+# invoked by no workflow and no script.
+run bash scripts/ci/repo-hygiene.sh
+
 # The published JSON Schemas are not readable by any Go check without a new
 # dependency, so the documents are validated against an external
 # implementation. Missing tooling skips unless

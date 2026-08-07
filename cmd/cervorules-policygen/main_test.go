@@ -33,17 +33,22 @@ routes:
     executor: worker
 `)
 
-	var stderr strings.Builder
-	if code := run([]string{"check", "-vocab", vocab, "-policy", policy}, &stderr); code != 0 {
+	var stdout, stderr strings.Builder
+	if code := run([]string{"check", "-vocab", vocab, "-policy", policy}, &stdout, &stderr); code != 0 {
 		t.Fatalf("check failed code=%d stderr=%s", code, stderr.String())
 	}
 	stderr.Reset()
-	if code := run([]string{"check", "-vocab", vocab, "-policy", policy, "-format", "json"}, &stderr); code != 0 {
+	if code := run([]string{"check", "-vocab", vocab, "-policy", policy, "-format", "json"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("json check failed code=%d stderr=%s", code, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), `"policy_hash"`) {
-		t.Fatalf("json check output missing metadata: %s", stderr.String())
+	// The machine-readable result goes to stdout; diagnostics stay on stderr.
+	if !strings.Contains(stdout.String(), `"policy_hash"`) {
+		t.Fatalf("json check output missing metadata: stdout=%s stderr=%s", stdout.String(), stderr.String())
 	}
+	if strings.Contains(stderr.String(), `"policy_hash"`) {
+		t.Fatalf("the JSON result must not go to stderr: %s", stderr.String())
+	}
+	stdout.Reset()
 	stderr.Reset()
 	code := run([]string{
 		"generate",
@@ -54,7 +59,7 @@ routes:
 		"-package", "policyrules",
 		"-vocab-package", "policyvocab",
 		"-vocab-import", "example.test/policyvocab",
-	}, &stderr)
+	}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("generate failed code=%d stderr=%s", code, stderr.String())
 	}
@@ -68,8 +73,8 @@ routes:
 }
 
 func TestRunVersion(t *testing.T) {
-	var stderr strings.Builder
-	code := run([]string{"-version"}, &stderr)
+	var stdout, stderr strings.Builder
+	code := run([]string{"-version"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("version failed: %s", stderr.String())
 	}
@@ -119,8 +124,8 @@ routes:
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var stderr strings.Builder
-			if code := run(tt.args, &stderr); code != tt.code {
+			var stdout, stderr strings.Builder
+			if code := run(tt.args, &stdout, &stderr); code != tt.code {
 				t.Fatalf("code=%d want=%d stderr=%s", code, tt.code, stderr.String())
 			}
 			if !strings.Contains(stderr.String(), tt.want) {
@@ -151,8 +156,8 @@ routes:
     executor: worker
 `)
 
-	var stderr strings.Builder
-	code := run([]string{"check", "-vocab", vocab, "-policy", policy, "-format", "json"}, &stderr)
+	var stdout, stderr strings.Builder
+	code := run([]string{"check", "-vocab", vocab, "-policy", policy, "-format", "json"}, &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("code=%d want=2 stderr=%s", code, stderr.String())
 	}

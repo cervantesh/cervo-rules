@@ -3,57 +3,16 @@
 Verified, unfixed defects. Each entry records how it was checked so a later
 reader can confirm it still holds instead of trusting this file.
 
-Last verified against `e55d5aa` (v3.0.0-rc.6) on 2026-08-06.
+Last verified against `d4eee31` on 2026-08-06. Three entries were fixed the
+same day and removed: the conformance recipe pointing at a nonexistent test,
+`repo-hygiene.sh` being invoked by nothing, and `check -format json` writing to
+stderr.
 
 This is a living list of open items. It is not a review record: the rc.1 review
 is in [post-rc-review.md](post-rc-review.md), and per-change decisions live in
 `docs/change-management/`.
 
-## Checks that pass without checking anything
-
-**The conformance recipe runs a test that does not exist.**
-`.cervorules/recipes/run-conformance.json` invokes
-`go test -run TestGeneratedRuntimePolicy`, and no test in the repository has
-that name. `go test -run` with a pattern matching nothing exits 0, so the step
-is green by construction and has always been.
-
-```bash
-grep -o '\-run [A-Za-z]*' .cervorules/recipes/run-conformance.json
-grep -rn "func TestGeneratedRuntimePolicy" --include="*_test.go" .   # no hits
-```
-
-Fix: point it at `TestConsumerConformanceSuiteCertifiesRepoLocalConsumers`, or
-delete the step. The same recipe's other step, `-run TestConsumerConformance`,
-does match.
-
-**`scripts/ci/repo-hygiene.sh` is invoked by nothing.**
-It is the only enforcement of the Operation/Target/Executor naming contract, and
-no workflow and no other script calls it.
-
-```bash
-grep -rn "repo-hygiene" .github/ scripts/    # only the script itself
-```
-
-Fix: add it to `required-build.yml` or to `scripts/ci/quality-gates.sh`.
-
 ## Machine-readable output that no machine can read
-
-**`check -format json` writes to stderr.**
-`cmd/cervorules-policygen/main.go` encodes the JSON result to stderr, so a
-caller redirecting stdout gets nothing. The recipes that consume it
-(`validate-policy.json`, `compare-policy.json`) therefore read an empty
-document.
-
-```bash
-go run ./cmd/cervorules-policygen check \
-  -vocab examples/routing-basic/policy-vocabulary.yaml \
-  -policy examples/routing-basic/policy-rules.yaml -format json 2>/dev/null | wc -c
-# 0
-```
-
-Fix: write the JSON payload to stdout and keep diagnostics on stderr. Note the
-payload also carries untagged `Source` and `TestSource` fields, which are empty
-for `check` but are part of the encoded struct.
 
 **`CodegenSnapshot.Facts` counts the vocabulary while every sibling counts the
 policy.** `generator.go:559` sets `Facts: len(vocab.spec.Facts)`, so retuning a

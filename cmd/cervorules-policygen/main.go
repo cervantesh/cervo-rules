@@ -28,10 +28,10 @@ type errorReport struct {
 }
 
 func main() {
-	os.Exit(run(os.Args[1:], os.Stderr))
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
-func run(args []string, stderr io.Writer) int {
+func run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "usage: cervorules-policygen <check|generate> [flags]")
 		return 2
@@ -42,7 +42,7 @@ func run(args []string, stderr io.Writer) int {
 	}
 	switch args[0] {
 	case "check":
-		return runCheck(args[1:], stderr)
+		return runCheck(args[1:], stdout, stderr)
 	case "generate":
 		return runGenerate(args[1:], stderr)
 	default:
@@ -51,7 +51,10 @@ func run(args []string, stderr io.Writer) int {
 	}
 }
 
-func runCheck(args []string, stderr io.Writer) int {
+// runCheck writes its machine-readable result to stdout and every diagnostic
+// to stderr. It used to encode the JSON to stderr, so a caller redirecting
+// stdout -- which is what the task recipes do -- read an empty document.
+func runCheck(args []string, stdout io.Writer, stderr io.Writer) int {
 	flags := flag.NewFlagSet("check", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	vocabPath := flags.String("vocab", "", "policy-vocabulary.yaml")
@@ -82,7 +85,7 @@ func runCheck(args []string, stderr io.Writer) int {
 	}
 	switch *format {
 	case "json":
-		if err := json.NewEncoder(stderr).Encode(out); err != nil {
+		if err := json.NewEncoder(stdout).Encode(out); err != nil {
 			fmt.Fprintf(stderr, "encode check result: %v\n", err)
 			return 1
 		}
