@@ -93,7 +93,15 @@ func NewClassifier(options HTTPClassificationOptions) (*Classifier, error) {
 			}
 		}
 		if strings.TrimSpace(rule.Regex) != "" {
-			re, err := regexp.Compile(rule.Regex)
+			// Compiled case-insensitively because everything else in this rule
+			// already is: Prefix and Contains are lowercased here and the
+			// request path is lowercased at match time. A regex was compiled
+			// verbatim and matched against that lowercased path, so any regex
+			// containing an uppercase literal could never fire and its rule was
+			// silently skipped. No capability is lost by making it explicit —
+			// the path had already been lowercased, so case-sensitive matching
+			// was never available.
+			re, err := regexp.Compile("(?i)" + rule.Regex)
 			if err != nil {
 				return nil, fmt.Errorf("compile path operation regex %q: %w", rule.Regex, err)
 			}

@@ -127,11 +127,11 @@ facts := cervorules.RequestFacts{
 
 HTTP support is an optional adapter, not the identity of CervoRules. Consumers
 that front HTTP traffic can use `FactsFromHTTPRequest` for simple extraction or
-`NewHTTPClassifier` for production classifiers that precompile regex path
+`NewClassifier` for production classifiers that precompile regex path
 rules.
 
 ```go
-classifier, err := cervorules.NewHTTPClassifier(cervorules.HTTPClassificationOptions{
+classifier, err := httpadapter.NewClassifier(httpadapter.HTTPClassificationOptions{
     CapabilityHeaders: []string{"X-Policy-Capability"},
     UserHeaders:       []string{"X-Policy-User"},
     PathCapabilities: []cervorules.PathCapability{
@@ -142,8 +142,8 @@ if err != nil {
     return err
 }
 
-facts := classifier.FactsFromHTTPRequest(r)
-req := facts.Request()
+requestFacts := classifier.FactsFromHTTPRequest(r)
+req := requestFacts.Request()
 ```
 
 ## Adapter Rules

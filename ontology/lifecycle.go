@@ -233,6 +233,16 @@ func (l Lifecycle) CheckTransition(snapshot Snapshot, individual Individual, to 
 			Suggestion: "use one of: " + joinStates(lifecycle.States),
 		}}
 	}
+	// Fail closed before reading the current state. StateOf returns the first
+	// match, so a snapshot recording an individual in two states of this
+	// lifecycle would silently answer with one of them: an order recorded as
+	// paid *and* refunded read as "paid", and a second refund was permitted.
+	// The honest answer is that the current state cannot be determined, and
+	// this check must not be reachable only through CheckIntegrity -- a policy
+	// requiring transition_allowed alone has to be safe too.
+	if errs := lifecycle.checkSingleState(snapshot, individual); len(errs) > 0 {
+		return errs
+	}
 	current, ok := snapshot.Normalize().StateOf(lifecycle.Name, individual)
 	if !ok {
 		if lifecycle.Initial == "" || target == lifecycle.Initial {
@@ -290,9 +300,51 @@ func (l Lifecycle) CheckTransition(snapshot Snapshot, individual Individual, to 
 }
 
 // checkSnapshot validates that recorded states belong to the lifecycle.
+// checkSingleState refutes a snapshot recording one individual in two states of
+// this lifecycle. A lifecycle state is functional by nature: an individual is
+// in one state, not two. Pass an empty individual to check every one.
+//
+// Nothing refuted this before, and StateOf returns the first match, so an order
+// recorded as both paid and refunded read as "paid" and a second refund was
+// permitted — defeating the terminal-state guarantee this type exists to give.
+func (l Lifecycle) checkSingleState(snapshot Snapshot, only Individual) core.Errors {
+	lifecycle := l.Normalize()
+	wanted := NewIndividual(string(only))
+	seen := map[Individual]State{}
+	var errs core.Errors
+	for _, assertion := range snapshot.Normalize().States {
+		if assertion.Lifecycle != lifecycle.Name {
+			continue
+		}
+		individual := NewIndividual(string(assertion.Individual))
+		if only != "" && individual != wanted {
+			continue
+		}
+		previous, ok := seen[individual]
+		if !ok {
+			seen[individual] = assertion.State
+			continue
+		}
+		if previous == assertion.State {
+			continue
+		}
+		errs = append(errs, core.Error{
+			Code:       ErrorCodeFunctionalViolation,
+			Severity:   core.SeverityFatal,
+			Component:  componentName,
+			Field:      "lifecycles." + lifecycle.Name + ".states",
+			Value:      string(individual),
+			Reason:     "individual is recorded in two states of lifecycle " + lifecycle.Name + ": " + string(previous) + " and " + string(assertion.State),
+			Suggestion: "record one current state per individual; a history belongs outside the snapshot",
+		})
+	}
+	return errs
+}
+
 func (l Lifecycle) checkSnapshot(snapshot Snapshot) core.Errors {
 	lifecycle := l.Normalize()
 	var errs core.Errors
+	errs = append(errs, lifecycle.checkSingleState(snapshot, "")...)
 	for _, assertion := range snapshot.Normalize().States {
 		if assertion.Lifecycle != lifecycle.Name {
 			continue

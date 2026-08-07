@@ -28,7 +28,7 @@ lives in `cervantesh/cervo-rules-v2`; the active repository is v3-root.
 - Confirm every new or materially expanded dependency has recorded review fields: purpose, standard library alternative, runtime/generator scope, license, update policy, and consumer impact.
 - Confirm generated policy packages do not import generator-only dependencies.
 - Confirm runtime config merge semantics in `docs/runtime-env-mapping.md` match implementation and tests.
-- Confirm production HTTP classifier docs prefer `NewHTTPClassifier` for regex validation.
+- Confirm production HTTP classifier docs prefer `httpadapter.NewClassifier` for regex validation.
 - When the optional `facts` package changes, confirm the logic-inspired facts
   docs, ADRs, examples, and package coverage remain current.
 - Confirm generated-policy consumers can use `testkit.AssertGeneratedRuntimePolicy` instead of local compatibility checks.

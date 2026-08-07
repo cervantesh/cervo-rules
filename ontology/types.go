@@ -117,11 +117,19 @@ func (s Snapshot) Normalize() Snapshot {
 		}
 		return out.Relations[i].Object < out.Relations[j].Object
 	})
+	// State is part of the key, unlike the sibling sorts which already order by
+	// their full tuple. Without it, two contradictory assertions for one
+	// individual kept whatever order the resolver produced, and StateOf returns
+	// the first match -- so the same world answered a guard differently
+	// depending on how the caller happened to build the slice.
 	sort.SliceStable(out.States, func(i, j int) bool {
 		if out.States[i].Lifecycle != out.States[j].Lifecycle {
 			return out.States[i].Lifecycle < out.States[j].Lifecycle
 		}
-		return out.States[i].Individual < out.States[j].Individual
+		if out.States[i].Individual != out.States[j].Individual {
+			return out.States[i].Individual < out.States[j].Individual
+		}
+		return out.States[i].State < out.States[j].State
 	})
 	return out
 }

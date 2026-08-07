@@ -7,7 +7,7 @@ startup and shared runtime objects are reused.
 
 - Compile policies once with `Compile()` or a generated `PolicyFactory`.
 - Reuse `*core.CompiledDecisionFlow` across goroutines.
-- Build one `httpadapter.HTTPClassifier` with `NewHTTPClassifier`; do not call
+- Build one `httpadapter.Classifier` with `NewClassifier`; do not call
   the package-level helper for high-volume routes with regex matchers.
 - Set `HTTPClassificationOptions.OmitHeaders` when the caller only needs
   selected classification headers and does not need the full header map in

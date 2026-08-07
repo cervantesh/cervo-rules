@@ -113,7 +113,7 @@ go test -run TestGatewayShapedV2FixtureUsesGeneratedFactoryHTTPAndLimits -count=
 
 Those tests prove that packaged v2 tools can generate code for temp consumers
 and that gateway-style adoption uses the generated factory, HTTP classifier,
-runtime options, `DecisionResult`, and `CheckLimits` together.
+runtime options, `DecisionResult`, and `limits.Check` together.
 
 A private repository needs no extra configuration here: `gh` reuses the login
 from `gh auth login`, and CI uses the workflow's own `GITHUB_TOKEN`.

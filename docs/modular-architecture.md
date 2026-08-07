@@ -10,10 +10,10 @@ should prefer direct subpackage imports.
 | --- | --- | --- |
 | `core` | Decision flows, compiled engines, requests, decisions, predicates, actions, vocabulary, retry, breaker, trace, inspection. | Runtime config loading, transport parsing, package publishing, generator parsing. |
 | `runtime` | `PolicyRuntimeConfig`, runtime config merge, config validation, runtime option constructors. | Decision evaluation, HTTP parsing, consumer environment variable parsing. |
-| `limits` | `Limits`, `RequestedLimits`, `LimitViolations`, `CheckLimits`. | JSON payload parsing, HTTP status mapping, provider-specific payload names. |
+| `limits` | `Budget`, `Requested`, `Violations`, `Check`. | JSON payload parsing, HTTP status mapping, provider-specific payload names. |
 | `httpadapter` | Optional HTTP request-to-facts classification and generic facts adapters. | Core policy semantics, non-HTTP adapter ownership. |
 | `facts` | Optional flat facts, pattern queries, bounded derivation, validation diagnostics, and derivation explanations. | Core policy decisions, transport parsing, consumer vocabulary, Prolog runtime semantics. |
-| `decisioncache` | Optional caller-owned cache wrapper for pure decision results. | Core policy semantics, cache invalidation policy, distributed cache ownership, live health freshness. |
+| `decisioncache` | Reserved: a module marker with no cache contracts yet. | Core policy semantics, cache invalidation policy, distributed cache ownership, live health freshness. |
 | `observe` | Decision observations, reports, redaction, audit envelopes. | Logger, metrics, tracing, database, or audit sink dependencies. |
 | `testkit` | Generated policy contract checks and readiness scorecards. | Runtime production behavior or generator implementation. |
 
@@ -43,9 +43,9 @@ import (
 )
 ```
 
-Generated factory methods use `runtime.PolicyRuntimeConfig` and return
-`*core.CompiledDecisionFlow`. This keeps generated policy packages independent
-from the root facade while preserving readable generated code.
+Generated factory methods take `runtime.PolicyRuntimeConfig` and return
+`core.Engine`. This keeps generated policy packages independent from the root
+facade while preserving readable generated code.
 
 ## Migration Sequence
 
@@ -54,7 +54,7 @@ from the root facade while preserving readable generated code.
 3. Change request/decision handling to import `core` where narrow imports help.
 4. Keep root facade imports temporarily only when migration churn is not worth
    the immediate change.
-5. Add a `testkit.GeneratedRuntimePolicyContract` test beside the generated
+5. Add a `testkit.ConsumerConformanceContract` test beside the generated
    policy package.
 
 ## Change Management

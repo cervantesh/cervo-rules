@@ -124,7 +124,7 @@
     {
       "path": "github.com/cervantesh/cervo-rules/v3/decisioncache",
       "owns": [
-        "decision cache contracts"
+        "reserved: a module marker; no cache contracts are exported yet"
       ],
       "public_types": null,
       "public_funcs": null,

@@ -105,6 +105,27 @@ func (o Ontology) Validate() core.Errors {
 		declared[entity] = struct{}{}
 	}
 	var errs core.Errors
+	// Two signatures for one relation are an authoring mistake with no right
+	// answer, and the two readers disagreed about which one wins: Check builds
+	// a map, so the last declaration replaced the first, while domainOf loops
+	// and returns the first. A declared constraint could therefore stop being
+	// enforced, or be enforced against the wrong types, with nothing reported.
+	seenSignature := map[Relation]struct{}{}
+	for _, signature := range model.Signatures {
+		if _, ok := seenSignature[signature.Relation]; ok {
+			errs = append(errs, core.Error{
+				Code:       ErrorCodeFunctionalViolation,
+				Severity:   core.SeverityFatal,
+				Component:  componentName,
+				Field:      "signatures",
+				Value:      string(signature.Relation),
+				Reason:     "relation has more than one predicate signature",
+				Suggestion: "declare one signature per relation",
+			})
+			continue
+		}
+		seenSignature[signature.Relation] = struct{}{}
+	}
 	unknownEntity := func(field string, entity EntityType) {
 		if entity == "" {
 			return
