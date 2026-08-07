@@ -65,7 +65,7 @@ The current blockers are operational and adoption-oriented:
 | Release workflow confidence | The fixed Dockerfile has CI coverage, but the full tag workflow had not rerun successfully after the fix. | **Met at rc.6.** Successful `Publish Packages` run on the `v3.0.0-rc.6` tag, with `verify-github-release.sh` run as a workflow step and again from a clean shell. |
 | Migration confidence | Tooling exists, but no real external consumer had migrated. | **Met.** `gold-executor` moved its seven fact rules from hand-written Go into the DSL, including two disjunctions, with its gate reduced to input sanitisation and 48 assertions passing. Recorded in `docs/v3/compound-predicates.md` §5. |
 | Final API audit | v3 API changed broadly across primitives, generated policy, facts, and observability. | **Met, and now enforced.** `docs/v3/public-api-inventory.json` covers all ten public packages, and `TestPublicAPIInventoryMatchesSource` parses the source and fails on drift in either direction. Every error code's wire string is pinned by `TestErrorCodeWireStrings`, and `TestEveryErrorCodeIsDocumented` fails when a code is added without documentation. |
-| Wiki/report drift | Docs were refreshed before the tag; release evidence changed afterward. | **Open.** The wiki has not been refreshed since the rc.5/rc.6 release-tooling change. |
+| Wiki/report drift | Docs were refreshed before the tag; release evidence changed afterward. | **Met.** The wiki now links into the repository instead of mirroring it, so it cannot drift from documents it does not restate. See `docs/v3/wiki-refresh.md`. |
 
 The four "still requiring pre-GA audit" items above are addressed as follows.
 No generated public wrapper reintroduces v2 naming: `TestGenerateV3PolicyFactoryCompilesAndRoutes`

@@ -1,9 +1,39 @@
-# v3 Wiki And Report Refresh Plan
+# v3 Wiki
 
-Issues: #398, #402.
+The wiki lives at https://github.com/cervantesh/cervo-rules/wiki
 
-The wiki should mirror the repo docs after each v3 RC PR batch. This document is
-the repo-side source of truth for the next wiki update.
+## It links, it does not mirror
+
+This plan originally called for eight wiki pages mirroring repo docs. That was
+dropped, and the reason is the blocker's own name: "wiki/report drift". The
+repository docs are versioned with the code that implements them, and several
+are now enforced by tests -- the public API inventory, the error-code strings,
+the JSON Schemas and the generated metadata document all fail the build when
+they drift. A wiki copy of those files would be a second source with no such
+enforcement, going stale silently.
+
+So the wiki is five pages that orient a reader and link into the repository:
+Home, Policy DSL, Architecture, Migration, Releases, Project status. Nothing
+there restates a contract, so nothing there can contradict one.
+
+## Updating it
+
+The wiki is a git repository:
+
+```bash
+git clone https://github.com/cervantesh/cervo-rules.wiki.git
+```
+
+Commits need the GitHub noreply address; the account rejects pushes that expose
+a private email.
+
+Update it when the shape of the project changes -- a new package, a new DSL
+construct, a change to how releases are cut. Do not update it when a document
+it links to changes, because that is the point of linking.
+
+## Historical: the original mirror plan
+
+Kept for the record. This is not the current approach.
 
 ## Pages To Refresh
 
