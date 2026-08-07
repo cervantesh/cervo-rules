@@ -3,10 +3,12 @@
 Verified, unfixed defects. Each entry records how it was checked so a later
 reader can confirm it still holds instead of trusting this file.
 
-Last verified against `d4eee31` on 2026-08-06. Three entries were fixed the
-same day and removed: the conformance recipe pointing at a nonexistent test,
-`repo-hygiene.sh` being invoked by nothing, and `check -format json` writing to
-stderr.
+Last verified against `28bbebe` on 2026-08-06. Five entries were fixed the same
+day and removed: the conformance recipe pointing at a nonexistent test,
+`repo-hygiene.sh` being invoked by nothing, `check -format json` writing to
+stderr, the unpinned error-code wire strings, and the public API inventory
+listing four of ten packages. The last two are now enforced by tests rather
+than by documents.
 
 This is a living list of open items. It is not a review record: the rc.1 review
 is in [post-rc-review.md](post-rc-review.md), and per-change decisions live in
@@ -54,26 +56,6 @@ list(Draft202012Validator(s).iter_errors(d))   # 1 error
 
 Fix: extend the schema to the keys the manifest actually uses, and pick which of
 the two schemas is authoritative.
-
-## Untested contract surface
-
-**Nothing pins the wire strings of the error codes.** Tests compare the Go
-constants to each other, so renaming `ErrorCodeMissingFact`'s value from
-`missing_fact` to anything else passes. The strings are documented as stable and
-appear in consumers' audit records.
-
-```bash
-grep -rn '"missing_fact"\|"invalid_fact"' --include="*_test.go" .   # no hits
-```
-
-Fix: one table test asserting the literal string of each exported `ErrorCode`.
-
-## Tracked elsewhere
-
-`docs/v3/public-api-inventory.json` omits several public packages and
-`docs/v3/structured-errors.md` documents a minority of the error codes. Both are
-pre-existing and belong to the "Final API audit" GA blocker already recorded in
-[post-rc-review.md](post-rc-review.md).
 
 ## Deliberately out of scope
 

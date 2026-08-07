@@ -59,13 +59,24 @@ Still requiring pre-GA audit:
 
 The current blockers are operational and adoption-oriented:
 
-| Blocker | Why It Blocks GA | Required Evidence |
+| Blocker | Why It Blocks GA | Status |
 | --- | --- | --- |
-| Clean tag publish | `v3.0.0-rc.1` needed manual OCI recovery after PR #439. | A new RC tag publishes generic and OCI packages from CI without manual repair. |
-| Release workflow confidence | The fixed Dockerfile has CI coverage, but the full tag workflow has not rerun successfully after the fix. | Successful `Publish Packages` run on a post-fix tag. |
-| Migration confidence | Tooling exists, but no real external consumer has migrated. | At least one clean consumer fixture or real consumer migration report reviewed. |
-| Final API audit | v3 API changed broadly across primitives, generated policy, facts, and observability. | Public API inventory reviewed after final RC changes. |
-| Wiki/report drift | Docs were refreshed before the tag; release evidence changed afterward. | Final checkpoint and wiki/report refresh after the clean post-fix RC. |
+| Clean tag publish | `v3.0.0-rc.1` needed manual OCI recovery after PR #439. | **Met at rc.6.** Pushing the tag ran `Publish Packages` with no manual step; it built, published and verified its own output. rc.5 needed manual repair because the workflow targeted a package API github.com does not have. |
+| Release workflow confidence | The fixed Dockerfile has CI coverage, but the full tag workflow had not rerun successfully after the fix. | **Met at rc.6.** Successful `Publish Packages` run on the `v3.0.0-rc.6` tag, with `verify-github-release.sh` run as a workflow step and again from a clean shell. |
+| Migration confidence | Tooling exists, but no real external consumer had migrated. | **Met.** `gold-executor` moved its seven fact rules from hand-written Go into the DSL, including two disjunctions, with its gate reduced to input sanitisation and 48 assertions passing. Recorded in `docs/v3/compound-predicates.md` §5. |
+| Final API audit | v3 API changed broadly across primitives, generated policy, facts, and observability. | **Met, and now enforced.** `docs/v3/public-api-inventory.json` covers all ten public packages, and `TestPublicAPIInventoryMatchesSource` parses the source and fails on drift in either direction. Every error code's wire string is pinned by `TestErrorCodeWireStrings`, and `TestEveryErrorCodeIsDocumented` fails when a code is added without documentation. |
+| Wiki/report drift | Docs were refreshed before the tag; release evidence changed afterward. | **Open.** The wiki has not been refreshed since the rc.5/rc.6 release-tooling change. |
+
+The four "still requiring pre-GA audit" items above are addressed as follows.
+No generated public wrapper reintroduces v2 naming: `TestGenerateV3PolicyFactoryCompilesAndRoutes`
+rejects `BuildPolicy`, `Capability`, `Service` and `Provider` in generated
+source. Docs, schemas and examples were swept for v3 naming during the rc.5
+release-tooling change. The deferred compatibility helpers remain in
+`cervantesh/cervo-rules-v2` and outside this module.
+
+Policy inspection and compatibility JSON versioning is the one that is not
+closed: `schemas/v3/generated-policy-metadata.schema.json` describes a document
+nothing produces, which is recorded in `known-gaps.md`.
 
 ## Deferred Work
 

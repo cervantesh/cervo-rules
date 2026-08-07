@@ -14,17 +14,92 @@ The common contract starts in `v3/core`:
 - `Error`: single structured error with `Code`, `Field`, `Value`, `Reason`, and optional `Cause`.
 - `Errors`: multi-error collection with stable code lookup.
 
-Initial vocabulary codes:
+Every code is listed below. The list is enforced: `core` has a test that pins
+each code's wire string and fails when a code is declared without appearing
+here, because a code that reaches a consumer's audit record and is documented
+nowhere is not a contract.
 
-| Code | Field | Meaning |
+### Vocabulary and rules
+
+| Code | Meaning |
+| --- | --- |
+| `empty_operation` | An operation was required but normalized to empty. |
+| `unknown_operation` | An operation is not present in the active vocabulary. |
+| `empty_target` | A target was required but normalized to empty. |
+| `unknown_target` | A target is not present in the active vocabulary. |
+| `empty_executor` | An executor was required but normalized to empty. |
+| `unknown_executor` | An executor is not present in the active vocabulary. |
+| `invalid_rule` | A rule-level validation error. |
+| `invalid_config` | A configuration value is not usable. |
+| `renamed_primitive` | A v2 primitive name was used where a v3 name is required. |
+| `unsupported_feature` | The requested feature is not part of this generator's scope. |
+| `deprecated_field` | A field kept only for migration was used. |
+
+### Runtime config
+
+| Code | Meaning |
+| --- | --- |
+| `invalid_runtime_config` | A `PolicyRuntimeConfig` value failed validation. |
+
+### Generation and compatibility
+
+| Code | Meaning |
+| --- | --- |
+| `invalid_policy_schema` | Policy YAML does not match the supported shape. |
+| `schema_validation_failed` | A document failed validation against a published JSON Schema. |
+| `policy_build_failed` | A generated `PolicyFactory` refused to build; wraps the cause with policy metadata. |
+| `generated_policy_invalid` | Generated policy source is not usable. |
+| `deprecated_generated_api` | Generated code exposes an API that v3 removed. |
+| `compat_breaking_change` | A compatibility comparison found a breaking change. |
+| `internal_invariant_failed` | The generator reached a state it believes impossible; report it. |
+
+### Decision evaluation
+
+| Code | Meaning |
+| --- | --- |
+| `evaluation_failed` | A decision could not be produced. |
+| `context_canceled` | The caller's context was cancelled mid-decision. |
+| `context_deadline_exceeded` | The caller's deadline elapsed mid-decision. |
+
+### Facts engine
+
+These come from the optional `facts` package and its budgets.
+
+| Code | Meaning |
+| --- | --- |
+| `budget_exceeded` | An evaluation budget was exhausted. |
+| `unsafe_rule` | A rule is not range-restricted. |
+| `unsafe_negation` | Negation was used outside a safe stratum. |
+| `max_facts_exceeded` | Materialization passed `MaxFacts`. |
+| `max_bindings_exceeded` | Binding expansion passed `MaxBindings`. |
+| `max_iterations_exceeded` | Fixpoint iteration passed `MaxIterations`. |
+| `expensive_rule` | A rule crossed the expensive-rule binding threshold. |
+| `rule_disabled` | A rule was skipped because it is disabled. |
+
+### Conditions and facts a policy reads
+
+The seam a policy consults before allowing an operation. Every one of these is
+a refusal to answer, never a "the guard ran and found nothing wrong".
+
+| Code | Meaning | What a consumer should do |
 | --- | --- | --- |
-| `empty_operation` | `operation` | An operation was required but normalized to empty. |
-| `unknown_operation` | `operation` | An operation is not present in the active vocabulary. |
-| `empty_target` | `target` | A target was required but normalized to empty. |
-| `unknown_target` | `target` | A target is not present in the active vocabulary. |
-| `empty_executor` | `executor` | An executor was required but normalized to empty. |
-| `unknown_executor` | `executor` | An executor is not present in the active vocabulary. |
-| `invalid_rule` | `rule` | A rule-level validation error. |
+| `unknown_condition` | A policy required a condition the evaluator does not register. | Fail the request. The guard was never wired up. |
+| `condition_failed` | A condition evaluator returned an error. | Fail the request. |
+| `missing_conditions` | The policy declares conditions but was built without an evaluator. | Fix the build; this is a wiring error, not a request error. |
+| `missing_fact` | A fact a predicate reads is absent from `Request.Metadata` and the policy declares no default. | Treat as a malformed request, not as a denial. |
+| `invalid_fact` | A fact is unparseable, non-finite, or outside its declared bounds. | Treat as a malformed request. `Error.Value` carries the observed value and is marked `Sensitive`. |
+
+### Limits
+
+From the optional `limits` package, applied after a route is chosen.
+
+| Code | Meaning |
+| --- | --- |
+| `body_bytes_exceeded` | Request body passed `MaxBodyBytes`. |
+| `max_tokens_exceeded` | Requested tokens passed `MaxTokens`. |
+| `stream_not_allowed` | Streaming was requested where the budget forbids it. |
+| `tools_not_allowed` | Tool use was requested where the budget forbids it. |
+| `images_not_allowed` | Images were requested where the budget forbids it. |
 
 ## Adoption Plan
 

@@ -3,24 +3,323 @@
   "module": "github.com/cervantesh/cervo-rules/v3",
   "packages": [
     {
-      "path": "github.com/cervantesh/cervo-rules/v3/core",
-      "owns": ["decision runtime contracts", "operation/target/executor primitives"],
-      "public_types": ["Operation", "Target", "Executor", "Request", "Decision", "DecisionResult", "DecisionOptions", "Engine", "Error", "Errors", "RoutingPlan"]
+      "path": "github.com/cervantesh/cervo-rules/v3",
+      "owns": [
+        "module marker only; no compatibility facade"
+      ],
+      "public_types": null,
+      "public_funcs": null,
+      "public_consts": [
+        "ModulePath"
+      ]
     },
     {
-      "path": "github.com/cervantesh/cervo-rules/v3/runtime",
-      "owns": ["generated policy factory contracts", "runtime config contracts"],
-      "public_types": ["PolicyFactory", "PolicyMetadata", "PolicyRuntimeConfig"]
+      "path": "github.com/cervantesh/cervo-rules/v3/core",
+      "owns": [
+        "decision runtime contracts",
+        "operation/target/executor primitives",
+        "structured errors and caller-owned redaction",
+        "the named-condition seam"
+      ],
+      "public_types": [
+        "Condition",
+        "ConditionFunc",
+        "ConditionSet",
+        "Conditions",
+        "Decision",
+        "DecisionObservation",
+        "DecisionOption",
+        "DecisionOptions",
+        "DecisionResult",
+        "DecisionStats",
+        "DecisionTrace",
+        "DecisionTraceStep",
+        "Engine",
+        "Error",
+        "ErrorCode",
+        "Errors",
+        "Executor",
+        "Operation",
+        "Redactor",
+        "Request",
+        "RoutingPlan",
+        "RoutingRule",
+        "RoutingStrategy",
+        "Severity",
+        "StaticVocabulary",
+        "Target",
+        "Vocabulary",
+        "VocabularyOption"
+      ],
+      "public_funcs": [
+        "AllowedExecutors",
+        "AllowedOperations",
+        "AllowedTargets",
+        "NewCondition",
+        "NewDecisionOptions",
+        "NewDecisionResult",
+        "NewExecutor",
+        "NewIndexedRoutingPlan",
+        "NewLinearRoutingPlan",
+        "NewOperation",
+        "NewTarget",
+        "NewVocabulary",
+        "RedactFields",
+        "WithObservation",
+        "WithTrace"
+      ],
+      "public_consts": [
+        "DecisionObservationSchemaVersion",
+        "DecisionTraceSchemaVersion",
+        "ErrorCodeBodyBytesExceeded",
+        "ErrorCodeBudgetExceeded",
+        "ErrorCodeCompatBreakingChange",
+        "ErrorCodeConditionFailed",
+        "ErrorCodeContextCanceled",
+        "ErrorCodeContextDeadlineExceeded",
+        "ErrorCodeDeprecatedField",
+        "ErrorCodeDeprecatedGeneratedAPI",
+        "ErrorCodeEmptyExecutor",
+        "ErrorCodeEmptyOperation",
+        "ErrorCodeEmptyTarget",
+        "ErrorCodeEvaluationFailed",
+        "ErrorCodeExpensiveRule",
+        "ErrorCodeGeneratedPolicyInvalid",
+        "ErrorCodeImagesNotAllowed",
+        "ErrorCodeInternalInvariantFailed",
+        "ErrorCodeInvalidConfig",
+        "ErrorCodeInvalidFact",
+        "ErrorCodeInvalidPolicySchema",
+        "ErrorCodeInvalidRule",
+        "ErrorCodeInvalidRuntimeConfig",
+        "ErrorCodeMaxBindingsExceeded",
+        "ErrorCodeMaxFactsExceeded",
+        "ErrorCodeMaxIterationsExceeded",
+        "ErrorCodeMaxTokensExceeded",
+        "ErrorCodeMissingConditions",
+        "ErrorCodeMissingFact",
+        "ErrorCodePolicyBuildFailed",
+        "ErrorCodeRenamedPrimitive",
+        "ErrorCodeRuleDisabled",
+        "ErrorCodeSchemaValidationFailed",
+        "ErrorCodeStreamNotAllowed",
+        "ErrorCodeToolsNotAllowed",
+        "ErrorCodeUnknownCondition",
+        "ErrorCodeUnknownExecutor",
+        "ErrorCodeUnknownOperation",
+        "ErrorCodeUnknownTarget",
+        "ErrorCodeUnsafeNegation",
+        "ErrorCodeUnsafeRule",
+        "ErrorCodeUnsupportedFeature",
+        "IndexedRoutingStrategy",
+        "LinearRoutingStrategy",
+        "ModulePath",
+        "RedactedValue",
+        "SeverityError",
+        "SeverityFatal",
+        "SeverityInfo",
+        "SeverityWarning"
+      ]
+    },
+    {
+      "path": "github.com/cervantesh/cervo-rules/v3/decisioncache",
+      "owns": [
+        "decision cache contracts"
+      ],
+      "public_types": null,
+      "public_funcs": null,
+      "public_consts": [
+        "ModulePath"
+      ]
     },
     {
       "path": "github.com/cervantesh/cervo-rules/v3/facts",
-      "owns": ["optional facts engine contracts"],
-      "public_types": ["EvalOptions", "EvaluationPlan", "ComplexityDiagnostic", "Result", "Fact", "Pattern"]
+      "owns": [
+        "optional bounded facts engine contracts"
+      ],
+      "public_types": [
+        "Atom",
+        "Binding",
+        "BindingFrame",
+        "BindingLayout",
+        "BindingSlot",
+        "ComplexityDiagnostic",
+        "CompoundIndexOptions",
+        "CompoundIndexRecommendation",
+        "EvalOptions",
+        "EvaluationPlan",
+        "EvaluationStats",
+        "Fact",
+        "Pattern",
+        "PatternPlan",
+        "Result",
+        "RuleEvaluationStat",
+        "RulePlan",
+        "Term",
+        "TermKind",
+        "TraceMode"
+      ],
+      "public_funcs": [
+        "NewBindingFrame",
+        "NewBindingLayout",
+        "NewEvaluationPlan",
+        "RecommendCompoundIndexes",
+        "StructuredErrorFromDiagnostic",
+        "StructuredErrorsFromDiagnostics"
+      ],
+      "public_consts": [
+        "ModulePath",
+        "TermConst",
+        "TermVar",
+        "TraceDisabled",
+        "TraceEnabled"
+      ]
+    },
+    {
+      "path": "github.com/cervantesh/cervo-rules/v3/httpadapter",
+      "owns": [
+        "HTTP classification at the adapter boundary"
+      ],
+      "public_types": [
+        "Classifier",
+        "HTTPClassificationOptions",
+        "HeaderOptions",
+        "PathOperation",
+        "RequestFacts"
+      ],
+      "public_funcs": [
+        "NewClassifier",
+        "Redactor",
+        "SensitiveFieldNames"
+      ],
+      "public_consts": [
+        "ModulePath"
+      ]
+    },
+    {
+      "path": "github.com/cervantesh/cervo-rules/v3/limits",
+      "owns": [
+        "request payload budgets, applied after a route is chosen"
+      ],
+      "public_types": [
+        "Budget",
+        "Requested",
+        "Violation",
+        "Violations"
+      ],
+      "public_funcs": [
+        "Check"
+      ],
+      "public_consts": [
+        "ModulePath"
+      ]
     },
     {
       "path": "github.com/cervantesh/cervo-rules/v3/observe",
-      "owns": ["operational report contracts"],
-      "public_types": ["PolicyEvaluationReport"]
+      "owns": [
+        "low-cardinality reports and audit envelopes"
+      ],
+      "public_types": [
+        "PolicyEvaluationReport"
+      ],
+      "public_funcs": [
+        "NewPolicyEvaluationReport"
+      ],
+      "public_consts": [
+        "ModulePath",
+        "PolicyEvaluationReportSchemaVersion"
+      ]
+    },
+    {
+      "path": "github.com/cervantesh/cervo-rules/v3/ontology",
+      "owns": [
+        "symbolic guards: entity types, disjointness, lifecycles"
+      ],
+      "public_types": [
+        "Check",
+        "CheckKind",
+        "Constraint",
+        "ConstraintFunc",
+        "DisjointSet",
+        "EntityType",
+        "FunctionalProperty",
+        "Guard",
+        "Individual",
+        "Lifecycle",
+        "Ontology",
+        "PredicateSignature",
+        "Relation",
+        "RelationAssertion",
+        "Snapshot",
+        "SnapshotResolver",
+        "State",
+        "StateAssertion",
+        "Transition",
+        "TypeAssertion"
+      ],
+      "public_funcs": [
+        "NewEntityType",
+        "NewGuard",
+        "NewIndividual",
+        "NewRelation",
+        "NewState",
+        "WithRequestScope"
+      ],
+      "public_consts": [
+        "CheckHasType",
+        "CheckInState",
+        "CheckIntegrity",
+        "CheckTransitionAllowed",
+        "ErrorCodeDisjointViolation",
+        "ErrorCodeDomainViolation",
+        "ErrorCodeFunctionalViolation",
+        "ErrorCodeIllegalTransition",
+        "ErrorCodeRangeViolation",
+        "ErrorCodeTerminalState",
+        "ErrorCodeUnknownEntityType",
+        "ErrorCodeUnknownLifecycle",
+        "ErrorCodeUnknownState",
+        "ErrorCodeUnreachableState"
+      ]
+    },
+    {
+      "path": "github.com/cervantesh/cervo-rules/v3/runtime",
+      "owns": [
+        "generated policy factory contracts",
+        "runtime config contracts"
+      ],
+      "public_types": [
+        "PolicyBuildError",
+        "PolicyFactory",
+        "PolicyMetadata",
+        "PolicyRuntimeConfig"
+      ],
+      "public_funcs": [
+        "NewPolicyBuildError"
+      ],
+      "public_consts": [
+        "ModulePath"
+      ]
+    },
+    {
+      "path": "github.com/cervantesh/cervo-rules/v3/testkit",
+      "owns": [
+        "consumer conformance contracts"
+      ],
+      "public_types": [
+        "ConsumerConformanceContract",
+        "FactsCase",
+        "FactsEvaluator",
+        "PackageSmoke",
+        "RuntimeCase"
+      ],
+      "public_funcs": [
+        "CheckConsumerConformance",
+        "MustAssertConsumerConformance"
+      ],
+      "public_consts": [
+        "ModulePath"
+      ]
     }
   ]
 }
