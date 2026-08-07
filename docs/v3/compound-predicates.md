@@ -629,12 +629,42 @@ derived facts derives them first and puts the results in `Metadata`; the seam
 already exists and needs nothing new.
 
 **Do the v2 `limits` come back in the same work?**
-No, separate issue. They share the word "policy" and nothing else. A predicate
-is a boolean over facts that decides whether a rule applies; a limit is a
-budget over a request payload that produces a `limits.Violations` list after a
-route is chosen. Different input, different output type, different point in the
-pipeline. `limits.Budget` already exists as a Go type — the missing piece is
-DSL surface and codegen, which is a self-contained job.
+No, and on reflection the answer is stronger than "separate issue".
+
+`limits.Budget` is `MaxTokens`, `AllowStream`, `AllowTools`, `AllowImages`,
+`MaxBodyBytes`. Four of those five are LLM gateway vocabulary, and
+`AGENTS.md` states the rule directly: "Do not add CervoProxy, gateway, AI,
+provider-specific payload, or tenant concepts to core APIs", and "Keep
+model/profile selection outside CervoRules."
+
+The placement distinction is what matters. `limits/` as an optional leaf package
+is defensible on the same grounds as `ontology`: importing it is the only way to
+pay for it. Putting `max_tokens` in the **DSL** is not, because the DSL is the
+shared surface — every policy author sees it, the published schema carries it,
+and `policygen` has to know about it. That is precisely "making one consumer the
+shape of the core API" from `docs/agnosticism.md`.
+
+And the general case is already covered, domain-neutrally, by this change. A
+consumer that wants to refuse an oversized request declares the fact and writes
+the rule:
+
+```yaml
+facts:
+  requested_tokens: { type: integer }
+```
+```yaml
+denies:
+  - id: deny-token-budget
+    when: { fact: requested_tokens, op: gt, value: 4000 }
+```
+
+No AI vocabulary enters the shared contract; the consumer names the fact and
+picks the number. The one thing this does not reproduce is `limits.Violations`
+reporting several breaches at once after a route is chosen, where a deny is
+first-match. That is a difference in output shape, resolvable in the consumer.
+
+So this is not deferred work waiting for a slot. It is a decision that the v2
+shape should not return to the DSL.
 
 **Is `explain` part of this or later?**
 Phase C of this, not a separate issue. It is the difference between "the policy

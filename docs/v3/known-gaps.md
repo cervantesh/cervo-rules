@@ -120,11 +120,14 @@ pre-existing and belong to the "Final API audit" GA blocker already recorded in
 
 Not gaps. Recorded so nobody reopens them as oversights:
 
-- **v2 `limits` codegen.** A predicate is a boolean over facts deciding whether
-  a rule applies; a limit is a budget over a request payload producing
-  `limits.Violations` after a route is chosen. Different input, different output
-  type, different point in the pipeline. `limits.Budget` already exists as a Go
-  type, so the missing piece is DSL surface and codegen — a self-contained job.
+- **v2 `limits` in the DSL.** Not deferred: decided against. `limits.Budget` is
+  `MaxTokens`, `AllowStream`, `AllowTools`, `AllowImages`, `MaxBodyBytes` —
+  four of five are LLM gateway vocabulary, and `AGENTS.md` forbids adding "AI,
+  provider-specific payload, or tenant concepts to core APIs". `limits/` as an
+  optional leaf package is fine, because importing it is the only way to pay for
+  it; the DSL is the shared surface and is not. The general case is already
+  covered domain-neutrally by declaring a fact and writing a `when:` rule, so
+  the consumer names the number and CervoRules never learns what a token is.
 - **Generated derived facts.** Per [ADR 0014](../adr/0014-symbolic-guard-layer.md),
   `facts` owns derivation and this layer owns refutation; merging them would put
   guard evaluation on the derivation path, and a decision guard is on the hot
