@@ -72,6 +72,18 @@ The split is deliberate. `min`, `max` and `default` are decision-bearing
 numbers, and the `PolicyHash` is taken over the raw bytes of the policy file, so
 putting them there means editing a threshold moves the hash.
 
+**A fact you declare bounds for must be read by some rule.** The generator emits
+a parser only for the facts a predicate mentions, so a bound on a fact nothing
+reads would never be applied: a request carrying `999`, or `NaN`, or nonsense
+for it would be decided as though the key were absent. Rather than let a
+declaration look like validation without being one, `check` and `generate`
+refuse the policy and name the fact. Reference it in a `when:`, or delete the
+declaration.
+
+A fact counts as read whether it is the subject of a leaf, the right-hand side
+of a `fact_value` comparison, or read by a route's predicate rather than a
+deny's.
+
 A route or deny can carry a `when` predicate:
 
 ```yaml

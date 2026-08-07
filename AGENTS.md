@@ -48,7 +48,10 @@ debugging.
 
 **Fail closed, with no exceptions.** A fact that is absent with no declared
 default, unparseable, non-finite, or outside its declared bounds returns a
-structured `missing_fact` / `invalid_fact` error. It never returns `false`. A
+structured `missing_fact` / `invalid_fact` error. That sentence is only true
+because a policy declaring bounds for a fact no rule reads is refused at build
+time: a parser is emitted for the facts predicates mention and for no others,
+so an unread bound would have protected nothing while looking like validation. It never returns `false`. A
 `false` reads as "the guard ran and found nothing wrong", which is the silent
 allow this library exists to prevent. `strconv.ParseFloat` accepts `"NaN"`, and
 a non-finite value passes every comparison without matching any.

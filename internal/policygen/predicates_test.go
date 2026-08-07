@@ -1087,3 +1087,94 @@ routes:
 	}
 	compileGeneratedPolicyWithVocab(t, predicateVocabGo, out.Source, minimalTestSource)
 }
+
+// A bound is only applied to a fact some predicate reads: the generator emits a
+// parser for those and for no others. A policy that declared `min` and `max`
+// for a fact no rule mentions therefore stated a constraint that protected
+// nothing, and a request carrying 999 or NaN for it was decided as though the
+// key were absent.
+//
+// The choice was between enforcing such a bound at decision time -- which makes
+// the fact required and changes the behaviour of policies already running --
+// and refusing the policy when it is built. Refusing puts the failure in front
+// of the author, and leaves every accepted bound meaning exactly what it says.
+func TestPolicyDeclaringBoundsForAFactNoRuleReadsIsRejected(t *testing.T) {
+	policy := `version: cervorules.policy.v3
+name: unread-bound.v3
+defaults:
+  executor: manual
+facts:
+  risk_pct: { min: 0, max: 100 }
+  exposure_pct: { min: 0, max: 5 }
+denies:
+  - id: deny-risk
+    reason: too much risk
+    when:
+      { fact: risk_pct, op: gt, value: 1.5 }
+routes:
+  - id: place
+    operation: trade.place
+    target: desk
+    executor: manual
+`
+	_, err := generatePredicatePolicy(t, predicateVocab, policy)
+	if err == nil {
+		t.Fatal("expected a policy declaring an unread bound to be rejected")
+	}
+	if !strings.Contains(err.Error(), "exposure_pct") {
+		t.Errorf("the error must name the offending fact, got: %v", err)
+	}
+	if strings.Contains(err.Error(), "risk_pct") {
+		t.Errorf("risk_pct is read by a rule and must not be reported: %v", err)
+	}
+}
+
+// A fact can be read without appearing as the subject of a leaf: `fact_value`
+// compares one fact against another, and the fact on the right is read just as
+// much as the one on the left. Counting only subjects would reject a correct
+// policy, which is the false positive this check has to avoid.
+func TestAFactReadOnlyAsAComparisonOperandCountsAsRead(t *testing.T) {
+	policy := `version: cervorules.policy.v3
+name: operand-read.v3
+defaults:
+  executor: manual
+facts:
+  score: { min: 0, max: 100 }
+  min_score: { min: 0, max: 100 }
+denies:
+  - id: deny-low-score
+    reason: below the floor
+    when:
+      { fact: score, op: lt, fact_value: min_score }
+routes:
+  - id: place
+    operation: trade.place
+    target: desk
+    executor: manual
+`
+	if _, err := generatePredicatePolicy(t, predicateVocab, policy); err != nil {
+		t.Fatalf("min_score is read as a comparison operand: %v", err)
+	}
+}
+
+// A route's `when:` reads facts too. A check that looked only at denies would
+// reject a policy whose bound is enforced on the routing path.
+func TestAFactReadOnlyByARouteCountsAsRead(t *testing.T) {
+	policy := `version: cervorules.policy.v3
+name: route-read.v3
+defaults:
+  executor: manual
+facts:
+  risk_pct: { min: 0, max: 100 }
+routes:
+  - id: place
+    operation: trade.place
+    target: desk
+    executor: manual
+    when:
+      { fact: risk_pct, op: lt, value: 2.0 }
+`
+	if _, err := generatePredicatePolicy(t, predicateVocab, policy); err != nil {
+		t.Fatalf("risk_pct is read by a route predicate: %v", err)
+	}
+}

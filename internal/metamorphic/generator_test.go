@@ -74,10 +74,19 @@ func newRandomPolicy(rng *rand.Rand, index int) randomPolicy {
 	}
 
 	for i := 0; i < 1+rng.Intn(3); i++ {
+		when := randomCompositePredicate(rng, policy.Facts)
+		if i == 0 {
+			// The first rule must read the bounded fact. Its bounds are what
+			// make the inert variant's predicate unsatisfiable, and a bound is
+			// only enforced -- and only accepted by the generator -- for a fact
+			// some rule reads.
+			when.Kids[0] = predNode{Kind: "leaf", Fact: policy.bounded.Name, Op: "gte",
+				Value: strconv.FormatFloat(policy.bounded.Min, 'f', 1, 64)}
+		}
 		deny := randomDeny{
 			ID:     fmt.Sprintf("deny-%d", i),
 			Reason: fmt.Sprintf("random rule %d refused it", i),
-			When:   randomCompositePredicate(rng, policy.Facts),
+			When:   when,
 		}
 		// Half the rules are scoped to one operation; the rest apply to all.
 		if rng.Intn(2) == 0 {
@@ -236,8 +245,15 @@ func (p randomPolicy) policyYAML(variant string, transform func(predNode) predNo
 	fmt.Fprintf(&b, "version: cervorules.policy.v3\nname: %s-%s\n\n", strings.TrimSuffix(p.Name, ".v3"), variant)
 	fmt.Fprintf(&b, "defaults:\n  executor: %s\n\n", p.Executor)
 
+	// Bounds are declared only for facts a rule reads: the generator refuses a
+	// bound that would protect nothing, which is the behaviour these policies
+	// are meant to exercise rather than sidestep.
+	read := p.readFacts()
 	b.WriteString("facts:\n")
 	for _, fact := range p.Facts {
+		if !read[fact.Name] {
+			continue
+		}
 		switch fact.Kind {
 		case "number":
 			fmt.Fprintf(&b, "  %s: { min: %s, max: %s }\n", fact.Name,
@@ -271,4 +287,24 @@ func (p randomPolicy) policyYAML(variant string, transform func(predNode) predNo
 			op, op, p.Targets[i%len(p.Targets)], p.Executor)
 	}
 	return b.String()
+}
+
+// readFacts returns the facts some deny predicate mentions. Only these may
+// carry bounds: the generator rejects a bound no rule reads.
+func (p randomPolicy) readFacts() map[string]bool {
+	read := map[string]bool{}
+	var walk func(predNode)
+	walk = func(n predNode) {
+		if n.Kind == "leaf" {
+			read[n.Fact] = true
+			return
+		}
+		for _, kid := range n.Kids {
+			walk(kid)
+		}
+	}
+	for _, deny := range p.Denies {
+		walk(deny.When)
+	}
+	return read
 }

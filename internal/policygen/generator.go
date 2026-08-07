@@ -10,6 +10,7 @@ import (
 	"io"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -426,12 +427,55 @@ func validate(vocab vocabularySpec, policy policySpec) (policyPlan, error) {
 			return policyPlan{}, fmt.Errorf("test %q missing request operation", test.Name)
 		}
 	}
+	if err := rejectUnreadFactBounds(policy, referenced); err != nil {
+		return policyPlan{}, err
+	}
 	names := make([]string, 0, len(referenced))
 	for name := range referenced {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	return policyPlan{facts: facts, referenced: names}, nil
+}
+
+// rejectUnreadFactBounds refuses a policy that declares bounds for a fact no
+// rule reads.
+//
+// A parser is emitted only for the facts some predicate mentions, so a bound on
+// a fact nothing reads is never applied: a request carrying 999, or NaN, or
+// nonsense for it is decided as though the key were absent. The declaration
+// looks like validation and is not, which is the silent kind of wrong this
+// library exists to refuse.
+//
+// The alternative was to enforce such a bound at decision time, which would
+// have made the fact required and changed the behaviour of policies already in
+// production. Refusing here puts the failure in front of the author instead,
+// and leaves every declared bound meaning exactly what it says.
+func rejectUnreadFactBounds(policy policySpec, referenced map[string]struct{}) error {
+	unread := make([]string, 0, len(policy.Facts))
+	for name := range policy.Facts {
+		if _, ok := referenced[normalize(name)]; !ok {
+			unread = append(unread, name)
+		}
+	}
+	if len(unread) == 0 {
+		return nil
+	}
+	sort.Strings(unread)
+	return fmt.Errorf(
+		"policy declares bounds for %s, which no rule reads: a bound is only "+
+			"enforced for a fact some predicate mentions, so this one would "+
+			"protect nothing. Reference the fact in a `when:`, or remove the "+
+			"declaration",
+		strings.Join(quoteEach(unread), ", "))
+}
+
+func quoteEach(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		out = append(out, strconv.Quote(value))
+	}
+	return out
 }
 
 // validateConditions checks each declared condition carries the fields its kind
